@@ -1,0 +1,111 @@
+---
+import '../styles/global.css';
+
+const { title = 'MendoCultura' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Ticketera mendocina para descubrir eventos culturales, turísticos y gastronómicos." />
+    <title>{title}</title>
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="/" aria-label="Ir al inicio de MendoCultura">
+        <span class="brand-mark">MC</span>
+        <span>MendoCultura</span>
+      </a>
+      <button class="menu-button" type="button" data-menu-button aria-expanded="false">Menú</button>
+      <nav class="nav" data-nav>
+        <a href="/" data-public>Inicio</a>
+        <a href="/events" data-public>Eventos</a>
+        <a href="/tickets" data-roles="USER,ORGANIZER,ADMIN">Mis entradas</a>
+        <a href="/validate" data-roles="ORGANIZER,VALIDATOR,ADMIN">Validar entrada</a>
+        <a href="/organizer" data-roles="ORGANIZER,ADMIN">Panel organizador</a>
+        <a href="/admin" data-roles="ADMIN">Admin</a>
+        <a href="/login" data-guest>Iniciar sesión</a>
+        <a href="/register" data-guest>Crear cuenta</a>
+        <a href="#" data-logout hidden>Cerrar sesión</a>
+      </nav>
+    </header>
+    <main>
+      <slot />
+    </main>
+    <footer class="site-footer">
+      <div>
+        <strong>MendoCultura</strong>
+        <p>Entradas digitales para vendimias, bodegas, recitales, ferias y experiencias de Mendoza.</p>
+      </div>
+      <div class="footer-links">
+        <a href="/events">Explorar eventos</a>
+        <a href="/validate">Validación</a>
+        <a href="/login">Acceso</a>
+      </div>
+    </footer>
+    <script>
+      const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+      const nav = document.querySelector('[data-nav]');
+      const menuButton = document.querySelector('[data-menu-button]');
+
+      function getStoredUser() {
+        try {
+          return JSON.parse(localStorage.getItem('mendocultura_user') || 'null');
+        } catch {
+          return null;
+        }
+      }
+
+      function applyNavigation(user) {
+        const role = user?.role || null;
+        const isLoggedIn = Boolean(localStorage.getItem('mendocultura_token') && role);
+        document.querySelectorAll('[data-roles]').forEach((link) => {
+          const roles = link.getAttribute('data-roles').split(',');
+          link.hidden = !isLoggedIn || !roles.includes(role);
+        });
+        document.querySelectorAll('[data-guest]').forEach((link) => {
+          link.hidden = isLoggedIn;
+        });
+        const logout = document.querySelector('[data-logout]');
+        if (logout) logout.hidden = !isLoggedIn;
+      }
+
+      async function refreshSession() {
+        const token = localStorage.getItem('mendocultura_token');
+        if (!token) {
+          applyNavigation(null);
+          return;
+        }
+        applyNavigation(getStoredUser());
+        try {
+          const response = await fetch(`${apiUrl}/me`, { headers: { Authorization: `Bearer ${token}` } });
+          if (!response.ok) throw new Error('invalid session');
+          const data = await response.json();
+          localStorage.setItem('mendocultura_user', JSON.stringify(data.user));
+          applyNavigation(data.user);
+        } catch {
+          localStorage.removeItem('mendocultura_token');
+          localStorage.removeItem('mendocultura_user');
+          applyNavigation(null);
+        }
+      }
+
+      document.querySelector('[data-logout]')?.addEventListener('click', (event) => {
+        event.preventDefault();
+        localStorage.removeItem('mendocultura_token');
+        localStorage.removeItem('mendocultura_user');
+        window.location.href = '/';
+      });
+
+      menuButton?.addEventListener('click', () => {
+        const expanded = menuButton.getAttribute('aria-expanded') === 'true';
+        menuButton.setAttribute('aria-expanded', String(!expanded));
+        nav?.classList.toggle('is-open', !expanded);
+      });
+
+      refreshSession();
+    </script>
+  </body>
+</html>

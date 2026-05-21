@@ -1,0 +1,78 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="MendoCultura | Eventos de Mendoza">
+  <section class="hero">
+    <div class="hero-card">
+      <div class="eyebrow">Ticketera mendocina</div>
+      <h1>Viví Mendoza con entradas digitales claras, simples y seguras.</h1>
+      <p class="lead">
+        Descubrí vendimias, bodegas, recitales, teatro, ferias gastronómicas y experiencias turísticas.
+        Comprá en pocos pasos, guardá tu QR y presentalo en el ingreso del evento.
+      </p>
+      <div class="actions">
+        <a class="button" href="/events">Explorar eventos</a>
+        <a class="button secondary" href="/register">Crear cuenta</a>
+      </div>
+    </div>
+    <aside class="hero-visual" aria-label="Viñedos y eventos de Mendoza">
+      <div class="hero-visual-content">
+        <span class="badge success">Demo funcional</span>
+        <h2>Eventos locales con identidad mendocina</h2>
+        <p>Catálogo, compra simulada, entradas con QR y validación online para una demo realista.</p>
+      </div>
+    </aside>
+  </section>
+
+  <section class="section-heading">
+    <div>
+      <div class="eyebrow">Cómo funciona</div>
+      <h2>Una experiencia pensada para visitantes, organizadores y validadores</h2>
+    </div>
+  </section>
+  <div class="grid compact">
+    <article class="card">
+      <span class="pill">1</span>
+      <h3>Explorá eventos</h3>
+      <p>Filtrá por categoría, departamento o palabra clave para encontrar tu próxima salida.</p>
+    </article>
+    <article class="card">
+      <span class="pill">2</span>
+      <h3>Simulá la compra</h3>
+      <p>Seleccioná cantidad, revisá el resumen y completá un pago ficticio sin guardar datos de tarjeta.</p>
+    </article>
+    <article class="card">
+      <span class="pill">3</span>
+      <h3>Mostrá tu QR</h3>
+      <p>En Mis entradas vas a ver el código y un QR visual para presentar en la puerta.</p>
+    </article>
+    <article class="card">
+      <span class="pill">4</span>
+      <h3>Validación segura</h3>
+      <p>Organizadores, validadores y administradores pueden marcar una entrada como usada una sola vez.</p>
+    </article>
+  </div>
+
+  <section class="section-heading">
+    <div>
+      <div class="eyebrow">Mendoza en agenda</div>
+      <h2>Cultura, turismo y noche con una plataforma local</h2>
+    </div>
+    <a class="button secondary" href="/events">Ver catálogo</a>
+  </section>
+  <div class="grid">
+    <article class="card">
+      <h3>Vendimia y bodegas</h3>
+      <p>Experiencias con paisaje de montaña, vino, gastronomía regional y propuestas turísticas.</p>
+    </article>
+    <article class="card">
+      <h3>Recitales y festivales</h3>
+      <p>Eventos masivos o medianos con cupos controlados y validación rápida en puerta.</p>
+    </article>
+    <article class="card">
+      <h3>Universidad y comunidad</h3>
+      <p>Congresos, charlas, ferias y actividades con una gestión simple para la organización.</p>
+    </article>
+  </div>
+</BaseLayout>

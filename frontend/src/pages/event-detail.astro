@@ -1,0 +1,316 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Detalle de evento | MendoCultura">
+  <section id="eventDetail" aria-live="polite">
+    <p class="notice">Cargando evento...</p>
+  </section>
+
+  <script>
+    const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+    const container = document.querySelector('#eventDetail');
+    const eventId = new URLSearchParams(window.location.search).get('id');
+    const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
+    const dateFormat = new Intl.DateTimeFormat('es-AR', { dateStyle: 'full', timeStyle: 'short' });
+    let currentEvent = null;
+    let checkoutStep = 1;
+    let selectedQuantity = 1;
+    const serviceFeeCents = 35000;
+
+    function escapeHtml(value = '') {
+      return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
+    }
+
+    async function readJson(response) {
+      try {
+        return await response.json();
+      } catch {
+        return {};
+      }
+    }
+
+    function galleryImages(event) {
+      return String(event.galleryImages || '')
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+
+    function mapUrl(event) {
+      if (event.mapUrl) return event.mapUrl;
+      const query = [event.address, event.venue, event.department, 'Mendoza Argentina'].filter(Boolean).join(', ');
+      return `https://www.google.com/maps?q=${encodeURIComponent(query)}&output=embed`;
+    }
+
+    function availabilityBadge(event) {
+      if (event.status !== 'PUBLISHED') return '<span class="badge warning">No publicado</span>';
+      if (event.availableTickets <= 0) return '<span class="badge danger">Agotado</span>';
+      return '<span class="badge success">Publicado</span>';
+    }
+
+    function renderCheckout() {
+      const event = currentEvent;
+      const unitPrice = event.priceCents;
+      const subtotal = unitPrice * selectedQuantity;
+      const fee = selectedQuantity > 0 ? serviceFeeCents : 0;
+      const total = subtotal + fee;
+      const soldOut = event.availableTickets <= 0;
+      const steps = ['Entradas', 'Resumen', 'Pago simulado', 'Confirmación'];
+
+      const stepHeader = `<div class="steps">${steps.map((step, index) => `<span class="step ${checkoutStep === index + 1 ? 'is-active' : ''}">${index + 1}. ${step}</span>`).join('')}</div>`;
+
+      if (soldOut) {
+        return `
+          <aside class="checkout-card sticky">
+            <h2>Entradas agotadas</h2>
+            <p class="notice error">No hay disponibilidad para este evento.</p>
+            <a class="button secondary" href="/events">Buscar otros eventos</a>
+          </aside>
+        `;
+      }
+
+      if (checkoutStep === 1) {
+        return `
+          <aside class="checkout-card sticky">
+            <h2>Comprar entrada</h2>
+            ${stepHeader}
+            <label>Tipo de entrada
+              <select id="ticketType">
+                <option>${escapeHtml(event.ticketType || 'General')}</option>
+              </select>
+            </label>
+            <label>Cantidad
+              <input id="quantity" type="number" min="1" max="${Math.min(4, event.availableTickets)}" value="${selectedQuantity}" />
+            </label>
+            <p><strong>${event.availableTickets}</strong> cupos disponibles de ${event.capacity}.</p>
+            <div class="price">${money.format(unitPrice / 100)}</div>
+            <button id="continueToSummary">Continuar</button>
+            <div id="checkoutMessage" style="margin-top:14px;"></div>
+          </aside>
+        `;
+      }
+
+      if (checkoutStep === 2) {
+        return `
+          <aside class="checkout-card sticky">
+            <h2>Resumen de compra</h2>
+            ${stepHeader}
+            <p><strong>${escapeHtml(event.title)}</strong><br>${dateFormat.format(new Date(event.startAt))}</p>
+            <p>Tipo: <strong>${escapeHtml(event.ticketType || 'General')}</strong></p>
+            <p>Cantidad: <strong>${selectedQuantity}</strong></p>
+            <p>Precio unitario: <strong>${money.format(unitPrice / 100)}</strong></p>
+            <p>Cargo de servicio simulado: <strong>${money.format(fee / 100)}</strong></p>
+            <div class="price">Total: ${money.format(total / 100)}</div>
+            <div class="actions">
+              <button class="secondary" id="backToSelector">Volver</button>
+              <button id="continueToPayment">Ir al pago</button>
+            </div>
+          </aside>
+        `;
+      }
+
+      if (checkoutStep === 3) {
+        return `
+          <aside class="checkout-card sticky">
+            <h2>Pago simulado</h2>
+            ${stepHeader}
+            <p class="notice">No ingreses datos reales. Esta pantalla no guarda número de tarjeta ni CVV.</p>
+            <label>Nombre del titular <input id="cardHolder" autocomplete="off" /></label>
+            <label>Número de tarjeta ficticio <input id="fakeCard" inputmode="numeric" maxlength="19" placeholder="4242 4242 4242 4242" autocomplete="off" /></label>
+            <div class="form-grid">
+              <label>Vencimiento <input id="expiration" placeholder="12/30" autocomplete="off" /></label>
+              <label>CVV <input id="cvv" inputmode="numeric" maxlength="4" autocomplete="off" /></label>
+            </div>
+            <label>DNI <input id="dni" inputmode="numeric" autocomplete="off" /></label>
+            <label>Email <input id="email" type="email" autocomplete="email" /></label>
+            <div class="actions">
+              <button class="secondary" id="backToSummary">Volver</button>
+              <button id="confirmPurchase">Confirmar compra</button>
+            </div>
+            <div id="checkoutMessage" style="margin-top:14px;"></div>
+          </aside>
+        `;
+      }
+
+      return `
+        <aside class="checkout-card sticky">
+          <h2>Compra confirmada</h2>
+          ${stepHeader}
+          <p class="notice success">Tu compra simulada fue aprobada. Ya podés ver tus entradas y el QR.</p>
+          <div class="actions">
+            <a class="button" href="/tickets">Ver mis entradas</a>
+            <a class="button secondary" href="/events">Explorar más eventos</a>
+          </div>
+        </aside>
+      `;
+    }
+
+    function renderEvent() {
+      const event = currentEvent;
+      const images = galleryImages(event);
+      const mainImage = event.imageUrl || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=1200&q=80';
+      container.innerHTML = `
+        <div class="split">
+          <div>
+            <article class="detail-hero card">
+              <img src="${escapeHtml(mainImage)}" alt="${escapeHtml(event.title)}" />
+              <div class="detail-body">
+                <div class="meta">
+                  <span class="pill">${escapeHtml(event.category)}</span>
+                  <span class="pill">${escapeHtml(event.department)}</span>
+                  ${availabilityBadge(event)}
+                </div>
+                <h1>${escapeHtml(event.title)}</h1>
+                <p class="lead">${escapeHtml(event.description || '')}</p>
+                <div class="grid compact">
+                  <div class="card"><strong>Fecha y hora</strong><p>${dateFormat.format(new Date(event.startAt))}</p></div>
+                  <div class="card"><strong>Venue</strong><p>${escapeHtml(event.venue)}</p></div>
+                  <div class="card"><strong>Ubicación</strong><p>${escapeHtml(event.address || event.department)}</p></div>
+                  <div class="card"><strong>Cupos</strong><p>${event.availableTickets} disponibles de ${event.capacity}</p></div>
+                </div>
+              </div>
+            </article>
+
+            <section class="section-heading"><div><div class="eyebrow">Detalle</div><h2>Por qué asistir</h2></div></section>
+            <div class="card">
+              <p>${escapeHtml(event.extendedDescription || event.description || 'Una propuesta mendocina para disfrutar con una entrada digital simple y segura.')}</p>
+              <div class="grid compact">
+                <div>
+                  <h3>Experiencia local</h3>
+                  <p>Cultura, turismo y comunidad en un evento pensado para vivir Mendoza.</p>
+                </div>
+                <div>
+                  <h3>Ingreso ágil</h3>
+                  <p>Presentá el QR en puerta para una validación rápida y sin papeles.</p>
+                </div>
+              </div>
+            </div>
+
+            <section class="section-heading"><div><div class="eyebrow">Galería</div><h2>Un vistazo al evento</h2></div></section>
+            <div class="gallery">
+              ${(images.length ? images : [mainImage]).map((image) => `<img src="${escapeHtml(image)}" alt="${escapeHtml(event.title)}" loading="lazy" />`).join('')}
+            </div>
+
+            <section class="section-heading"><div><div class="eyebrow">Información útil</div><h2>Antes de ir</h2></div></section>
+            <div class="grid">
+              <article class="card">
+                <h3>Importante</h3>
+                <p>${escapeHtml(event.importantInfo || 'Presentá tu entrada digital y DNI al ingresar.')}</p>
+              </article>
+              <article class="card">
+                <h3>Recomendaciones</h3>
+                <p>${escapeHtml(event.recommendations || 'Llegá con anticipación y revisá el pronóstico antes de salir.')}</p>
+              </article>
+            </div>
+
+            <section class="section-heading"><div><div class="eyebrow">Mapa</div><h2>Cómo llegar</h2></div></section>
+            <iframe class="map-frame" loading="lazy" referrerpolicy="no-referrer-when-downgrade" src="${escapeHtml(mapUrl(event))}" title="Mapa de ubicación del evento"></iframe>
+          </div>
+          <div id="checkoutSlot">${renderCheckout()}</div>
+        </div>
+      `;
+      bindCheckout();
+    }
+
+    function bindCheckout() {
+      document.querySelector('#continueToSummary')?.addEventListener('click', () => {
+        const quantity = Number(document.querySelector('#quantity').value);
+        const max = Math.min(4, currentEvent.availableTickets);
+        if (!quantity || quantity < 1 || quantity > max) {
+          document.querySelector('#checkoutMessage').innerHTML = `<p class="notice error">Podés comprar entre 1 y ${max} entradas.</p>`;
+          return;
+        }
+        selectedQuantity = quantity;
+        checkoutStep = 2;
+        renderEvent();
+      });
+      document.querySelector('#backToSelector')?.addEventListener('click', () => {
+        checkoutStep = 1;
+        renderEvent();
+      });
+      document.querySelector('#continueToPayment')?.addEventListener('click', () => {
+        const token = localStorage.getItem('mendocultura_token');
+        if (!token) {
+          document.querySelector('#checkoutSlot').innerHTML = `${renderCheckout()}<p class="notice error">Debés iniciar sesión para comprar. <a href="/login">Iniciar sesión</a></p>`;
+          return;
+        }
+        checkoutStep = 3;
+        renderEvent();
+      });
+      document.querySelector('#backToSummary')?.addEventListener('click', () => {
+        checkoutStep = 2;
+        renderEvent();
+      });
+      document.querySelector('#confirmPurchase')?.addEventListener('click', confirmPurchase);
+    }
+
+    async function confirmPurchase() {
+      const token = localStorage.getItem('mendocultura_token');
+      const message = document.querySelector('#checkoutMessage');
+      if (!token) {
+        message.innerHTML = '<p class="notice error">Debés iniciar sesión para comprar. <a href="/login">Iniciar sesión</a></p>';
+        return;
+      }
+      const required = ['cardHolder', 'fakeCard', 'expiration', 'cvv', 'dni', 'email'];
+      const missing = required.some((id) => !document.querySelector(`#${id}`).value.trim());
+      if (missing) {
+        message.innerHTML = '<p class="notice error">Completá todos los datos del pago simulado.</p>';
+        return;
+      }
+
+      const button = document.querySelector('#confirmPurchase');
+      button.disabled = true;
+      message.innerHTML = '<p class="notice">Procesando pago simulado...</p>';
+      await new Promise((resolve) => setTimeout(resolve, 900));
+
+      try {
+        const response = await fetch(`${apiUrl}/tickets/reserve`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ eventId: Number(eventId), quantity: selectedQuantity })
+        });
+        const data = await readJson(response);
+        if (response.status === 401 || response.status === 403) {
+          message.innerHTML = `<p class="notice error">${escapeHtml(data.message || 'Tu sesión expiró o no está activa.')} <a href="/login">Iniciar sesión</a></p>`;
+          return;
+        }
+        if (!response.ok) {
+          message.innerHTML = `<p class="notice error">${escapeHtml(data.message || 'Error al procesar la compra simulada.')}</p>`;
+          return;
+        }
+        checkoutStep = 4;
+        currentEvent.availableTickets = Math.max(0, currentEvent.availableTickets - selectedQuantity);
+        renderEvent();
+      } catch {
+        message.innerHTML = '<p class="notice error">No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:8080.</p>';
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    async function loadEvent() {
+      if (!eventId) {
+        container.innerHTML = '<p class="notice error">Evento inexistente.</p><a class="button" href="/events">Volver al catálogo</a>';
+        return;
+      }
+      try {
+        const response = await fetch(`${apiUrl}/events/${eventId}`);
+        const data = await readJson(response);
+        if (!response.ok) {
+          container.innerHTML = `<p class="notice error">${escapeHtml(data.message || 'El evento no existe o no está publicado.')}</p><a class="button" href="/events">Volver al catálogo</a>`;
+          return;
+        }
+        currentEvent = data.event;
+        renderEvent();
+      } catch {
+        container.innerHTML = '<p class="notice error">No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:8080.</p>';
+      }
+    }
+
+    loadEvent();
+  </script>
+</BaseLayout>

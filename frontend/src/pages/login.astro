@@ -1,0 +1,91 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Iniciar sesión | MendoCultura">
+  <section class="split">
+    <div class="form-card">
+      <div class="eyebrow">Acceso</div>
+      <h1>Iniciar sesión</h1>
+      <p>Usá tu cuenta para comprar entradas, ver tus tickets o gestionar eventos según tu rol.</p>
+      <label>Email <input id="email" type="email" value="usuario@mendocultura.local" autocomplete="email" /></label>
+      <label>Contraseña <input id="password" type="password" value="usuario123" autocomplete="current-password" /></label>
+      <div class="actions">
+        <button id="loginButton">Iniciar sesión</button>
+        <a class="button secondary" href="/register">Crear cuenta</a>
+      </div>
+      <div id="result" style="margin-top:16px;" aria-live="polite"></div>
+    </div>
+    <aside class="card">
+      <div class="eyebrow">Usuarios demo</div>
+      <h2>Probá la navegación por rol</h2>
+      <p>Ingresá con estos perfiles para ver cómo cambian el menú y los paneles disponibles.</p>
+      <div class="grid compact">
+        <button class="secondary" data-demo-email="usuario@mendocultura.local" data-demo-password="usuario123">Usuario</button>
+        <button class="secondary" data-demo-email="organizador@mendocultura.local" data-demo-password="organizador123">Organizador</button>
+        <button class="secondary" data-demo-email="validador@mendocultura.local" data-demo-password="validador123">Validador</button>
+        <button class="secondary" data-demo-email="admin@mendocultura.local" data-demo-password="admin123">Admin</button>
+      </div>
+    </aside>
+  </section>
+
+  <script>
+    const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+    const result = document.querySelector('#result');
+    const loginButton = document.querySelector('#loginButton');
+
+    function showMessage(type, message) {
+      result.innerHTML = `<p class="notice ${type}">${message}</p>`;
+    }
+
+    async function readJson(response) {
+      try {
+        return await response.json();
+      } catch {
+        return {};
+      }
+    }
+
+    document.querySelectorAll('[data-demo-email]').forEach((button) => {
+      button.addEventListener('click', () => {
+        document.querySelector('#email').value = button.dataset.demoEmail;
+        document.querySelector('#password').value = button.dataset.demoPassword;
+      });
+    });
+
+    loginButton.addEventListener('click', async () => {
+      const email = document.querySelector('#email').value.trim();
+      const password = document.querySelector('#password').value;
+
+      if (!email || !password) {
+        showMessage('error', 'Ingresá email y contraseña.');
+        return;
+      }
+
+      loginButton.disabled = true;
+      showMessage('', 'Ingresando...');
+
+      try {
+        const response = await fetch(`${apiUrl}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await readJson(response);
+        if (!response.ok) {
+          showMessage('error', data.message || 'No se pudo iniciar sesión. Revisá tus credenciales.');
+          return;
+        }
+        localStorage.setItem('mendocultura_token', data.token);
+        localStorage.setItem('mendocultura_user', JSON.stringify(data.user));
+        showMessage('success', 'Sesión iniciada correctamente. Redirigiendo...');
+        const destination = data.user?.role === 'ADMIN' ? '/admin' : data.user?.role === 'ORGANIZER' ? '/organizer' : data.user?.role === 'VALIDATOR' ? '/validate' : '/events';
+        window.location.href = destination;
+      } catch {
+        showMessage('error', 'No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:8080.');
+      } finally {
+        loginButton.disabled = false;
+      }
+    });
+  </script>
+</BaseLayout>

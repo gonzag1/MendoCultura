@@ -1,0 +1,143 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Administración | MendoCultura">
+  <section>
+    <div class="section-heading">
+      <div>
+        <div class="eyebrow">Administrador</div>
+        <h1>Panel administrador</h1>
+        <p class="lead">Métricas, usuarios, organizadores y auditoría para controlar la demo.</p>
+      </div>
+    </div>
+    <div id="sessionNotice" aria-live="polite"></div>
+    <div class="actions">
+      <button id="metricsButton">Ver métricas</button>
+      <button id="usersButton" class="secondary">Ver usuarios</button>
+      <button id="organizersButton" class="secondary">Ver organizadores</button>
+      <button id="eventsButton" class="secondary">Ver eventos</button>
+      <button id="auditButton" class="secondary">Ver auditoría</button>
+    </div>
+    <div id="adminData" style="margin-top:24px;" aria-live="polite"></div>
+  </section>
+
+  <script>
+    const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+    const token = localStorage.getItem('mendocultura_token');
+    const user = JSON.parse(localStorage.getItem('mendocultura_user') || 'null');
+    const adminData = document.querySelector('#adminData');
+    const sessionNotice = document.querySelector('#sessionNotice');
+
+    function escapeHtml(value = '') {
+      return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
+    }
+
+    function headers() {
+      return { Authorization: `Bearer ${token}` };
+    }
+
+    function hasAdminAccess() {
+      if (!token) {
+        sessionNotice.innerHTML = '<p class="notice error">Tenés que iniciar sesión como administrador. <a href="/login">Iniciar sesión</a></p>';
+        return false;
+      }
+      if (user?.role !== 'ADMIN') {
+        sessionNotice.innerHTML = '<p class="notice error">Tu usuario no tiene permisos de administrador.</p>';
+        return false;
+      }
+      sessionNotice.innerHTML = '<p class="notice success">Sesión activa como administrador.</p>';
+      return true;
+    }
+
+    async function readJson(response) {
+      try {
+        return await response.json();
+      } catch {
+        return {};
+      }
+    }
+
+    async function fetchAdmin(path) {
+      if (!hasAdminAccess()) return null;
+      adminData.innerHTML = '<p class="notice">Cargando información...</p>';
+      try {
+        const response = await fetch(`${apiUrl}${path}`, { headers: headers() });
+        const data = await readJson(response);
+        if (response.status === 401 || response.status === 403) {
+          adminData.innerHTML = `<p class="notice error">${escapeHtml(data.message || 'No tenés permisos para consultar esta información.')}</p>`;
+          return null;
+        }
+        if (!response.ok) {
+          adminData.innerHTML = `<p class="notice error">${escapeHtml(data.message || 'No se pudo consultar la información.')}</p>`;
+          return null;
+        }
+        return data;
+      } catch {
+        adminData.innerHTML = '<p class="notice error">No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:8080.</p>';
+        return null;
+      }
+    }
+
+    hasAdminAccess();
+
+    document.querySelector('#metricsButton').addEventListener('click', async () => {
+      const data = await fetchAdmin('/admin/metrics');
+      if (!data) return;
+      const labels = { users: 'Usuarios', events: 'Eventos', tickets: 'Entradas', usedTickets: 'Entradas usadas', purchases: 'Compras' };
+      adminData.className = 'grid compact';
+      adminData.innerHTML = Object.entries(labels).map(([key, label]) => `
+        <article class="card stat"><span class="pill">${label}</span><strong>${data[key] ?? 0}</strong></article>
+      `).join('');
+    });
+
+    document.querySelector('#usersButton').addEventListener('click', async () => {
+      const data = await fetchAdmin('/admin/users');
+      if (!data) return;
+      adminData.className = 'panel table-wrap';
+      adminData.innerHTML = `
+        <table>
+          <thead><tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Estado</th></tr></thead>
+          <tbody>${data.users.map((item) => `<tr><td>${escapeHtml(item.name)}</td><td>${escapeHtml(item.email)}</td><td><span class="pill">${item.role}</span></td><td>${item.status}</td></tr>`).join('')}</tbody>
+        </table>
+      `;
+    });
+
+    document.querySelector('#organizersButton').addEventListener('click', async () => {
+      const data = await fetchAdmin('/admin/organizers');
+      if (!data) return;
+      adminData.className = 'grid';
+      adminData.innerHTML = data.organizers.map((organizer) => `
+        <article class="card">
+          <span class="badge ${organizer.status === 'APPROVED' ? 'success' : 'warning'}">${organizer.status}</span>
+          <h3>${escapeHtml(organizer.businessName)}</h3>
+          <p>${escapeHtml(organizer.user?.email || '')}</p>
+          <p>CUIT: ${escapeHtml(organizer.taxId)} · Localidad: ${escapeHtml(organizer.locality)}</p>
+        </article>
+      `).join('') || '<p class="notice">No hay organizadores para mostrar.</p>';
+    });
+
+    document.querySelector('#eventsButton').addEventListener('click', async () => {
+      const data = await fetchAdmin('/admin/events');
+      if (!data) return;
+      adminData.className = 'grid';
+      adminData.innerHTML = data.events.map((event) => `
+        <article class="card">
+          <span class="badge ${event.status === 'PUBLISHED' ? 'success' : 'warning'}">${event.status}</span>
+          <h3>${escapeHtml(event.title)}</h3>
+          <p>${escapeHtml(event.category)} · ${escapeHtml(event.department)}</p>
+          <p>${event.availableTickets} cupos disponibles de ${event.capacity}</p>
+        </article>
+      `).join('') || '<p class="notice">No hay eventos para mostrar.</p>';
+    });
+
+    document.querySelector('#auditButton').addEventListener('click', async () => {
+      const data = await fetchAdmin('/admin/audit-logs');
+      if (!data) return;
+      adminData.className = 'grid';
+      adminData.innerHTML = data.auditLogs.map((log) => `
+        <article class="card"><span class="pill">${escapeHtml(log.action)}</span><p>${escapeHtml(log.detail)}</p><small>${new Date(log.createdAt).toLocaleString('es-AR')}</small></article>
+      `).join('') || '<p class="notice">No hay registros de auditoría para mostrar.</p>';
+    });
+  </script>
+</BaseLayout>

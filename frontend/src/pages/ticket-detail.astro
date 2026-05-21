@@ -1,0 +1,126 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Detalle de entrada | MendoCultura">
+  <section>
+    <div class="section-heading">
+      <div>
+        <div class="eyebrow">Entrada digital</div>
+        <h1>Detalle de entrada</h1>
+        <p class="lead">Mostrá este QR en el ingreso al evento. También podés copiar el código si necesitás validarlo manualmente.</p>
+      </div>
+      <a class="button secondary" href="/tickets">Volver a Mis entradas</a>
+    </div>
+    <div id="ticketDetail" aria-live="polite"></div>
+  </section>
+
+  <script>
+    import QRCode from 'qrcode';
+
+    const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+    const token = localStorage.getItem('mendocultura_token');
+    const container = document.querySelector('#ticketDetail');
+    const ticketId = new URLSearchParams(window.location.search).get('id');
+    const dateFormat = new Intl.DateTimeFormat('es-AR', { dateStyle: 'full', timeStyle: 'short' });
+
+    function escapeHtml(value = '') {
+      return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
+    }
+
+    async function readJson(response) {
+      try {
+        return await response.json();
+      } catch {
+        return {};
+      }
+    }
+
+    function statusBadge(status) {
+      if (status === 'USED') return '<span class="badge warning">Entrada ya utilizada</span>';
+      if (status === 'CANCELLED') return '<span class="badge danger">Entrada cancelada</span>';
+      return '<span class="badge success">Entrada válida</span>';
+    }
+
+    async function renderQr(code) {
+      const canvas = document.querySelector('[data-qr-code]');
+      if (!canvas) return;
+      try {
+        await QRCode.toCanvas(canvas, code, {
+          width: 220,
+          margin: 1,
+          color: { dark: '#241a14', light: '#ffffff' }
+        });
+      } catch {
+        canvas.replaceWith(Object.assign(document.createElement('p'), { className: 'notice error', textContent: 'No se pudo generar el QR.' }));
+      }
+    }
+
+    async function loadTicket() {
+      if (!token) {
+        container.innerHTML = '<div class="empty-state"><h2>Iniciá sesión para ver esta entrada</h2><p>Tu entrada digital está protegida por tu cuenta.</p><a class="button" href="/login">Iniciar sesión</a></div>';
+        return;
+      }
+      if (!ticketId) {
+        container.innerHTML = '<p class="notice error">Entrada inexistente.</p>';
+        return;
+      }
+
+      container.innerHTML = '<p class="notice">Cargando entrada...</p>';
+      try {
+        const response = await fetch(`${apiUrl}/tickets/${ticketId}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const data = await readJson(response);
+        if (response.status === 401 || response.status === 403) {
+          localStorage.removeItem('mendocultura_token');
+          localStorage.removeItem('mendocultura_user');
+          container.innerHTML = `<p class="notice error">${escapeHtml(data.message || 'Tu sesión expiró o no está activa.')} <a href="/login">Iniciar sesión</a></p>`;
+          return;
+        }
+        if (!response.ok) {
+          container.innerHTML = `<p class="notice error">${escapeHtml(data.message || 'No se pudo cargar la entrada.')}</p>`;
+          return;
+        }
+
+        const ticket = data.ticket;
+        const event = ticket.event || {};
+        const validationUrl = `/validate?eventId=${ticket.eventId}&code=${encodeURIComponent(ticket.code)}`;
+        container.innerHTML = `
+          <div class="split">
+            <article class="ticket-card">
+              ${statusBadge(ticket.status)}
+              <h2>${escapeHtml(event.title || 'Evento')}</h2>
+              <p><strong>${escapeHtml(event.venue || '')}</strong><br>${event.startAt ? dateFormat.format(new Date(event.startAt)) : ''}</p>
+              <div class="qr-box">
+                <canvas data-qr-code aria-label="QR de la entrada"></canvas>
+                <strong>Mostrá este QR en el ingreso al evento</strong>
+              </div>
+              <p><strong>Tipo de entrada:</strong> ${escapeHtml(event.ticketType || 'General')}</p>
+              <p><strong>Estado:</strong> ${escapeHtml(ticket.status)}</p>
+            </article>
+            <aside class="checkout-card sticky">
+              <h2>Código de validación</h2>
+              <p>Este QR representa el mismo código que usa el endpoint de validación. Si ya fue usado, el sistema bloqueará una segunda validación.</p>
+              <div class="code-box">${escapeHtml(ticket.code)}</div>
+              <div class="actions">
+                <button class="secondary" id="copyCodeButton">Copiar código</button>
+                <a class="button" href="${validationUrl}">Abrir validación</a>
+              </div>
+            </aside>
+          </div>
+        `;
+        await renderQr(ticket.code);
+        document.querySelector('#copyCodeButton')?.addEventListener('click', async (event) => {
+          await navigator.clipboard.writeText(ticket.code);
+          event.currentTarget.textContent = 'Código copiado';
+          setTimeout(() => (event.currentTarget.textContent = 'Copiar código'), 1600);
+        });
+      } catch {
+        container.innerHTML = '<p class="notice error">No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:8080.</p>';
+      }
+    }
+
+    loadTicket();
+  </script>
+</BaseLayout>

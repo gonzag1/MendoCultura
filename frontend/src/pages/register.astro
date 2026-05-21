@@ -1,0 +1,122 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Crear cuenta | MendoCultura">
+  <section class="split">
+    <div class="form-card">
+      <div class="eyebrow">Registro</div>
+      <h1>Crear cuenta</h1>
+      <p>Creá tu cuenta para comprar entradas. Si organizás eventos, podés solicitar un perfil organizador.</p>
+      <label>
+        Tipo de cuenta
+        <select id="accountType">
+          <option value="user">Usuario</option>
+          <option value="organizer">Organizador</option>
+        </select>
+      </label>
+      <div class="form-grid">
+        <label>Nombre completo <input id="name" autocomplete="name" /></label>
+        <label>Email <input id="email" type="email" autocomplete="email" /></label>
+        <label>DNI <input id="dni" inputmode="numeric" /></label>
+        <label>Contraseña <input id="password" type="password" autocomplete="new-password" /></label>
+      </div>
+      <div id="organizerFields" class="form-grid" hidden style="margin-top:14px;">
+        <label>Nombre comercial <input id="businessName" /></label>
+        <label>CUIT <input id="taxId" /></label>
+        <label class="full">Localidad <input id="locality" placeholder="Luján de Cuyo" /></label>
+      </div>
+      <div class="actions">
+        <button id="registerButton">Crear cuenta</button>
+        <a class="button secondary" href="/login">Ya tengo cuenta</a>
+      </div>
+      <div id="result" style="margin-top:16px;" aria-live="polite"></div>
+    </div>
+    <aside class="card">
+      <div class="eyebrow">Demo segura</div>
+      <h2>Qué podés hacer</h2>
+      <p>Los usuarios compran entradas con pago simulado. Los organizadores quedan sujetos a aprobación antes de gestionar eventos.</p>
+      <div class="meta">
+        <span class="pill">Entradas digitales</span>
+        <span class="pill">QR visual</span>
+        <span class="pill">Validación online</span>
+      </div>
+    </aside>
+  </section>
+
+  <script>
+    const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+    const result = document.querySelector('#result');
+    const registerButton = document.querySelector('#registerButton');
+    const accountType = document.querySelector('#accountType');
+    const organizerFields = document.querySelector('#organizerFields');
+
+    accountType.addEventListener('change', () => {
+      organizerFields.hidden = accountType.value !== 'organizer';
+    });
+
+    function showMessage(type, message) {
+      result.innerHTML = `<p class="notice ${type}">${message}</p>`;
+    }
+
+    async function readJson(response) {
+      try {
+        return await response.json();
+      } catch {
+        return {};
+      }
+    }
+
+    registerButton.addEventListener('click', async () => {
+      const payload = {
+        name: document.querySelector('#name').value.trim(),
+        email: document.querySelector('#email').value.trim(),
+        dni: document.querySelector('#dni').value.trim(),
+        password: document.querySelector('#password').value
+      };
+
+      if (!payload.name || !payload.email || !payload.password) {
+        showMessage('error', 'Nombre, email y contraseña son obligatorios.');
+        return;
+      }
+      if (payload.password.length < 6) {
+        showMessage('error', 'La contraseña debe tener al menos 6 caracteres.');
+        return;
+      }
+
+      let path = '/auth/register';
+      if (accountType.value === 'organizer') {
+        payload.businessName = document.querySelector('#businessName').value.trim();
+        payload.taxId = document.querySelector('#taxId').value.trim();
+        payload.locality = document.querySelector('#locality').value.trim();
+        path = '/auth/register-organizer';
+        if (!payload.businessName || !payload.taxId || !payload.locality) {
+          showMessage('error', 'Completá los datos del organizador.');
+          return;
+        }
+      }
+
+      registerButton.disabled = true;
+      showMessage('', 'Creando cuenta...');
+
+      try {
+        const response = await fetch(`${apiUrl}${path}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await readJson(response);
+        if (!response.ok) {
+          showMessage('error', data.message || 'No se pudo crear la cuenta.');
+          return;
+        }
+        const suffix = accountType.value === 'organizer' ? ' Tu solicitud de organizador quedó pendiente de aprobación.' : '';
+        result.innerHTML = `<p class="notice success">Cuenta creada.${suffix} Ya podés iniciar sesión.</p><a class="button" href="/login">Iniciar sesión</a>`;
+      } catch {
+        showMessage('error', 'No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:8080.');
+      } finally {
+        registerButton.disabled = false;
+      }
+    });
+  </script>
+</BaseLayout>

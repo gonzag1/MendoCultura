@@ -1,0 +1,147 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Eventos | MendoCultura">
+  <section>
+    <div class="section-heading">
+      <div>
+        <div class="eyebrow">Catálogo</div>
+        <h1>Eventos disponibles</h1>
+        <p class="lead">Buscá por nombre, categoría o departamento. Los filtros ignoran mayúsculas y tildes.</p>
+      </div>
+    </div>
+
+    <div class="form-card">
+      <div class="form-grid">
+        <label class="full">
+          Buscar
+          <input id="search" placeholder="vendimia, lujan, gastronomia, san rafael..." autocomplete="off" />
+        </label>
+        <label>
+          Categoría
+          <select id="category">
+            <option value="">Todas las categorías</option>
+          </select>
+        </label>
+        <label>
+          Departamento
+          <select id="department">
+            <option value="">Todos los departamentos</option>
+          </select>
+        </label>
+      </div>
+      <div class="actions">
+        <button id="searchButton">Filtrar eventos</button>
+        <button id="clearButton" class="secondary">Limpiar filtros</button>
+      </div>
+    </div>
+
+    <div id="events" class="grid" style="margin-top: 24px;" aria-live="polite"></div>
+  </section>
+
+  <script>
+    const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+    const eventsContainer = document.querySelector('#events');
+    const searchButton = document.querySelector('#searchButton');
+    const clearButton = document.querySelector('#clearButton');
+    const categorySelect = document.querySelector('#category');
+    const departmentSelect = document.querySelector('#department');
+
+    const categories = ['Vendimia', 'Bodegas', 'Recitales', 'Festivales', 'Teatro', 'Deportes', 'Gastronomía', 'Universitarios', 'Congresos', 'Exposiciones', 'Fiestas', 'Música', 'Turismo', 'Cultura', 'Arte', 'Cine', 'Danza', 'Infantil', 'Charlas', 'Ferias', 'Otros'];
+    const departments = ['Ciudad de Mendoza', 'Godoy Cruz', 'Guaymallén', 'Las Heras', 'Lavalle', 'Luján de Cuyo', 'Maipú', 'Junín', 'Rivadavia', 'San Martín', 'Santa Rosa', 'La Paz', 'Tunuyán', 'Tupungato', 'San Carlos', 'San Rafael', 'General Alvear', 'Malargüe'];
+    const money = new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS' });
+    const dateFormat = new Intl.DateTimeFormat('es-AR', { dateStyle: 'medium', timeStyle: 'short' });
+
+    categorySelect.innerHTML += categories.map((item) => `<option value="${item}">${item}</option>`).join('');
+    departmentSelect.innerHTML += departments.map((item) => `<option value="${item}">${item}</option>`).join('');
+
+    function escapeHtml(value = '') {
+      return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
+    }
+
+    async function readJson(response) {
+      try {
+        return await response.json();
+      } catch {
+        return {};
+      }
+    }
+
+    function eventCard(event) {
+      const image = event.imageUrl || 'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=900&q=80';
+      const soldOut = event.availableTickets <= 0;
+      return `
+        <article class="card event-card">
+          <div class="event-image"><img src="${escapeHtml(image)}" alt="${escapeHtml(event.title)}" loading="lazy" /></div>
+          <div class="event-content">
+            <div class="meta">
+              <span class="pill">${escapeHtml(event.category)}</span>
+              <span class="pill">${escapeHtml(event.department)}</span>
+            </div>
+            <h3>${escapeHtml(event.title)}</h3>
+            <p>${escapeHtml(event.description || '')}</p>
+            <p><strong>${escapeHtml(event.venue)}</strong><br>${dateFormat.format(new Date(event.startAt))}</p>
+            <div class="meta">
+              <span class="badge ${soldOut ? 'danger' : 'success'}">${soldOut ? 'Agotado' : `${event.availableTickets} cupos disponibles`}</span>
+              <span class="price">${money.format(event.priceCents / 100)}</span>
+            </div>
+            <div class="actions"><a class="button" href="/event-detail?id=${event.id}">Ver detalle</a></div>
+          </div>
+        </article>
+      `;
+    }
+
+    async function loadEvents() {
+      const params = new URLSearchParams();
+      const search = document.querySelector('#search').value.trim();
+      const category = categorySelect.value;
+      const department = departmentSelect.value;
+      if (search) params.set('q', search);
+      if (category) params.set('category', category);
+      if (department) params.set('department', department);
+
+      searchButton.disabled = true;
+      eventsContainer.innerHTML = '<p class="notice">Cargando eventos...</p>';
+      try {
+        const response = await fetch(`${apiUrl}/events?${params.toString()}`);
+        const data = await readJson(response);
+        if (!response.ok) {
+          eventsContainer.innerHTML = `<p class="notice error">${escapeHtml(data.message || 'No se pudieron cargar los eventos.')}</p>`;
+          return;
+        }
+        if (!data.events?.length) {
+          eventsContainer.innerHTML = `
+            <div class="empty-state">
+              <h2>No encontramos eventos para ese filtro</h2>
+              <p>Probá con otra categoría, departamento o una palabra más general.</p>
+              <button class="secondary" id="emptyClearButton">Ver todos los eventos</button>
+            </div>
+          `;
+          document.querySelector('#emptyClearButton')?.addEventListener('click', clearFilters);
+          return;
+        }
+
+        eventsContainer.innerHTML = data.events.map(eventCard).join('');
+      } catch {
+        eventsContainer.innerHTML = '<p class="notice error">No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:8080.</p>';
+      } finally {
+        searchButton.disabled = false;
+      }
+    }
+
+    function clearFilters() {
+      document.querySelector('#search').value = '';
+      categorySelect.value = '';
+      departmentSelect.value = '';
+      loadEvents();
+    }
+
+    searchButton.addEventListener('click', loadEvents);
+    clearButton.addEventListener('click', clearFilters);
+    document.querySelector('#search').addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') loadEvents();
+    });
+    loadEvents();
+  </script>
+</BaseLayout>

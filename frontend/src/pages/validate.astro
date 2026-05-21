@@ -1,0 +1,108 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Validar entrada | MendoCultura">
+  <section class="split">
+    <div class="form-card">
+      <div class="eyebrow">Ingreso</div>
+      <h1>Validar entrada</h1>
+      <p>Ingresá el código del ticket y el ID del evento. Si la entrada ya fue usada, el sistema lo advierte.</p>
+      <div id="sessionNotice" aria-live="polite"></div>
+      <label>ID del evento <input id="eventId" type="number" min="1" /></label>
+      <label>Código de entrada <textarea id="code" placeholder="Pegá el código del QR o del ticket"></textarea></label>
+      <button id="validateButton">Validar entrada</button>
+      <div id="result" style="margin-top:16px;" aria-live="polite"></div>
+    </div>
+    <aside class="card">
+      <div class="eyebrow">Control de acceso</div>
+      <h2>Validación online</h2>
+      <p>Disponible para roles organizador, validador y administrador. La validación marca la entrada como utilizada y evita doble ingreso.</p>
+      <div class="meta">
+        <span class="pill">QR o código</span>
+        <span class="pill">Una sola vez</span>
+        <span class="pill">Con JWT</span>
+      </div>
+    </aside>
+  </section>
+
+  <script>
+    const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+    const token = localStorage.getItem('mendocultura_token');
+    const user = JSON.parse(localStorage.getItem('mendocultura_user') || 'null');
+    const result = document.querySelector('#result');
+    const sessionNotice = document.querySelector('#sessionNotice');
+    const validateButton = document.querySelector('#validateButton');
+    const params = new URLSearchParams(window.location.search);
+
+    document.querySelector('#eventId').value = params.get('eventId') || '';
+    document.querySelector('#code').value = params.get('code') || '';
+
+    function showMessage(type, message) {
+      result.innerHTML = `<p class="notice ${type}">${message}</p>`;
+    }
+
+    async function readJson(response) {
+      try {
+        return await response.json();
+      } catch {
+        return {};
+      }
+    }
+
+    function validateSession() {
+      if (!token) {
+        sessionNotice.innerHTML = '<p class="notice error">Tenés que iniciar sesión como organizador, validador o administrador para validar entradas. <a href="/login">Iniciar sesión</a></p>';
+        validateButton.disabled = true;
+        return false;
+      }
+      if (!['ORGANIZER', 'VALIDATOR', 'ADMIN'].includes(user?.role)) {
+        sessionNotice.innerHTML = '<p class="notice error">Tu usuario no tiene permiso para validar entradas.</p>';
+        validateButton.disabled = true;
+        return false;
+      }
+      sessionNotice.innerHTML = `<p class="notice success">Sesión activa para validar como ${user.role}.</p>`;
+      validateButton.disabled = false;
+      return true;
+    }
+
+    validateSession();
+
+    validateButton.addEventListener('click', async () => {
+      if (!validateSession()) return;
+
+      const eventId = Number(document.querySelector('#eventId').value);
+      const code = document.querySelector('#code').value.trim();
+      if (!eventId || !code) {
+        showMessage('error', 'Ingresá el ID del evento y el código de entrada.');
+        return;
+      }
+
+      validateButton.disabled = true;
+      showMessage('', 'Validando...');
+
+      try {
+        const response = await fetch(`${apiUrl}/checkin`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify({ eventId, code })
+        });
+        const data = await readJson(response);
+        if (response.status === 401 || response.status === 403) {
+          showMessage('error', data.message || 'No tenés permisos para validar esta entrada.');
+          return;
+        }
+        result.innerHTML = response.ok
+          ? `<div class="notice success"><strong>${data.message || 'Entrada válida.'}</strong><br>Ingreso registrado correctamente.</div>`
+          : `<div class="notice error"><strong>${data.message || 'Entrada inválida.'}</strong><br>Revisá el código, el evento o el estado del ticket.</div>`;
+      } catch {
+        showMessage('error', 'No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:8080.');
+      } finally {
+        validateButton.disabled = false;
+      }
+    });
+  </script>
+</BaseLayout>
