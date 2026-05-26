@@ -1,35 +1,37 @@
-package httpapi
+package handlers
 
 import (
+	"MendoCultura/middleware"
+	"MendoCultura/utils"
 	"fmt"
 	"net/http"
 	"strconv"
 
-	"MendoCultura/internal/domain"
+	"MendoCultura/models"
 
 	"github.com/gin-gonic/gin"
 )
 
-func (s *Server) listUsers(c *gin.Context) {
-	var users []domain.User
+func (s *Server) ListUsers(c *gin.Context) {
+	var users []models.User
 	if err := s.db.Order("created_at desc").Find(&users).Error; err != nil {
-		serverError(c, "No se pudieron consultar los usuarios.")
+		utils.ServerError(c, "No se pudieron consultar los usuarios.")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"users": users})
 }
 
-func (s *Server) listOrganizers(c *gin.Context) {
-	var profiles []domain.OrganizerProfile
+func (s *Server) ListOrganizers(c *gin.Context) {
+	var profiles []models.OrganizerProfile
 	if err := s.db.Preload("User").Order("created_at desc").Find(&profiles).Error; err != nil {
-		serverError(c, "No se pudieron consultar los organizadores.")
+		utils.ServerError(c, "No se pudieron consultar los organizadores.")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"organizers": profiles})
 }
 
-func (s *Server) updateOrganizerStatus(c *gin.Context) {
-	user, _ := currentUser(c)
+func (s *Server) UpdateOrganizerStatus(c *gin.Context) {
+	user, _ := middleware.CurrentUser(c)
 	id, ok := parseID(c, "id")
 	if !ok {
 		return
@@ -38,33 +40,33 @@ func (s *Server) updateOrganizerStatus(c *gin.Context) {
 		Status string `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || !validAccountDecision(req.Status) {
-		badRequest(c, "El estado del organizador debe ser APPROVED, REJECTED o SUSPENDED.")
+		utils.BadRequest(c, "El estado del organizador debe ser APPROVED, REJECTED o SUSPENDED.")
 		return
 	}
 
 	profileStatus := req.Status
-	userStatus := domain.AccountActive
+	userStatus := models.AccountActive
 	if req.Status == "APPROVED" {
 		profileStatus = "APPROVED"
 	}
-	if req.Status == domain.AccountRejected {
-		userStatus = domain.AccountSuspended
+	if req.Status == models.AccountRejected {
+		userStatus = models.AccountSuspended
 	}
-	if req.Status == domain.AccountSuspended {
-		userStatus = domain.AccountSuspended
+	if req.Status == models.AccountSuspended {
+		userStatus = models.AccountSuspended
 	}
 
-	var profile domain.OrganizerProfile
+	var profile models.OrganizerProfile
 	if err := s.db.First(&profile, id).Error; err != nil {
-		notFound(c, "El organizador no existe.")
+		utils.NotFound(c, "El organizador no existe.")
 		return
 	}
 	if err := s.db.Model(&profile).Update("status", profileStatus).Error; err != nil {
-		serverError(c, "No se pudo actualizar el organizador.")
+		utils.ServerError(c, "No se pudo actualizar el organizador.")
 		return
 	}
-	if err := s.db.Model(&domain.User{}).Where("id = ?", profile.UserID).Update("status", userStatus).Error; err != nil {
-		serverError(c, "No se pudo actualizar la cuenta del organizador.")
+	if err := s.db.Model(&models.User{}).Where("id = ?", profile.UserID).Update("status", userStatus).Error; err != nil {
+		utils.ServerError(c, "No se pudo actualizar la cuenta del organizador.")
 		return
 	}
 
@@ -72,17 +74,17 @@ func (s *Server) updateOrganizerStatus(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"status": profileStatus})
 }
 
-func (s *Server) getAdminMetrics(c *gin.Context) {
+func (s *Server) GetAdminMetrics(c *gin.Context) {
 	var users int64
 	var events int64
 	var tickets int64
 	var usedTickets int64
 	var purchases int64
-	s.db.Model(&domain.User{}).Count(&users)
-	s.db.Model(&domain.Event{}).Count(&events)
-	s.db.Model(&domain.Ticket{}).Count(&tickets)
-	s.db.Model(&domain.Ticket{}).Where("status = ?", domain.TicketUsed).Count(&usedTickets)
-	s.db.Model(&domain.Purchase{}).Where("status = ?", domain.PurchasePaid).Count(&purchases)
+	s.db.Model(&models.User{}).Count(&users)
+	s.db.Model(&models.Event{}).Count(&events)
+	s.db.Model(&models.Ticket{}).Count(&tickets)
+	s.db.Model(&models.Ticket{}).Where("status = ?", models.TicketUsed).Count(&usedTickets)
+	s.db.Model(&models.Purchase{}).Where("status = ?", models.PurchasePaid).Count(&purchases)
 
 	c.JSON(http.StatusOK, gin.H{
 		"users":       users,
@@ -93,15 +95,15 @@ func (s *Server) getAdminMetrics(c *gin.Context) {
 	})
 }
 
-func (s *Server) getOrganizerReports(c *gin.Context) {
-	user, _ := currentUser(c)
-	var events []domain.Event
+func (s *Server) GetOrganizerReports(c *gin.Context) {
+	user, _ := middleware.CurrentUser(c)
+	var events []models.Event
 	query := s.db
-	if user.Role != domain.RoleAdmin {
+	if user.Role != models.RoleAdmin {
 		query = query.Where("organizer_id = ?", user.ID)
 	}
 	if err := query.Find(&events).Error; err != nil {
-		serverError(c, "No se pudieron calcular las estadísticas.")
+		utils.ServerError(c, "No se pudieron calcular las estadísticas.")
 		return
 	}
 
@@ -119,7 +121,7 @@ func (s *Server) getOrganizerReports(c *gin.Context) {
 	for _, event := range events {
 		sold := event.Capacity - event.AvailableTickets
 		var used int64
-		s.db.Model(&domain.Ticket{}).Where("event_id = ? AND status = ?", event.ID, domain.TicketUsed).Count(&used)
+		s.db.Model(&models.Ticket{}).Where("event_id = ? AND status = ?", event.ID, models.TicketUsed).Count(&used)
 		occupancy := 0
 		if event.Capacity > 0 {
 			occupancy = (sold * 100) / event.Capacity
@@ -138,8 +140,8 @@ func (s *Server) getOrganizerReports(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"reports": reports})
 }
 
-func (s *Server) listAuditLogs(c *gin.Context) {
-	var logs []domain.AuditLog
+func (s *Server) ListAuditLogs(c *gin.Context) {
+	var logs []models.AuditLog
 	query := s.db.Order("created_at desc").Limit(100)
 	if action := c.Query("action"); action != "" {
 		query = query.Where("action = ?", action)
@@ -148,14 +150,14 @@ func (s *Server) listAuditLogs(c *gin.Context) {
 		query = query.Where("user_id = ?", userID)
 	}
 	if err := query.Find(&logs).Error; err != nil {
-		serverError(c, "No se pudieron consultar los registros de auditoría.")
+		utils.ServerError(c, "No se pudieron consultar los registros de auditoría.")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"auditLogs": logs})
 }
 
 func (s *Server) audit(userID *uint, action string, entity string, entityID any, detail string) {
-	log := domain.AuditLog{
+	log := models.AuditLog{
 		UserID:   userID,
 		Action:   action,
 		Entity:   entity,
@@ -167,7 +169,7 @@ func (s *Server) audit(userID *uint, action string, entity string, entityID any,
 
 func validAccountDecision(status string) bool {
 	switch status {
-	case "APPROVED", domain.AccountRejected, domain.AccountSuspended:
+	case "APPROVED", models.AccountRejected, models.AccountSuspended:
 		return true
 	default:
 		return false

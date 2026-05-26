@@ -1,8 +1,10 @@
 .gocache/
+**/.gocache/
+**/.gocache*/
+backend/.gocache*/
 backend/.env
 frontend/.env
 frontend/node_modules/
 frontend/dist/
-*.log
 frontend/.astro/
-backend/.gocache*/
+*.log

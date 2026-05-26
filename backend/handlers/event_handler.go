@@ -1,13 +1,15 @@
-package httpapi
+package handlers
 
 import (
+	"MendoCultura/middleware"
+	"MendoCultura/utils"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
-	"MendoCultura/internal/domain"
+	"MendoCultura/models"
 
 	"github.com/gin-gonic/gin"
 )
@@ -34,17 +36,17 @@ type eventRequest struct {
 	Status              string   `json:"status"`
 }
 
-func (s *Server) listPublicEvents(c *gin.Context) {
-	var events []domain.Event
-	if err := s.db.Where("status = ?", domain.EventPublished).Order("start_at asc").Find(&events).Error; err != nil {
-		serverError(c, "No se pudieron consultar los eventos.")
+func (s *Server) ListPublicEvents(c *gin.Context) {
+	var events []models.Event
+	if err := s.db.Where("status = ?", models.EventPublished).Order("start_at asc").Find(&events).Error; err != nil {
+		utils.ServerError(c, "No se pudieron consultar los eventos.")
 		return
 	}
 
 	search := normalizeText(c.Query("q"))
 	category := normalizeText(c.Query("category"))
 	department := normalizeText(c.Query("department"))
-	filtered := make([]domain.Event, 0, len(events))
+	filtered := make([]models.Event, 0, len(events))
 
 	for _, event := range events {
 		if category != "" && normalizeText(event.Category) != category {
@@ -65,59 +67,59 @@ func (s *Server) listPublicEvents(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"events": filtered})
 }
 
-func (s *Server) getPublicEvent(c *gin.Context) {
+func (s *Server) GetPublicEvent(c *gin.Context) {
 	id, ok := parseID(c, "id")
 	if !ok {
 		return
 	}
 
-	var event domain.Event
-	if err := s.db.Where("id = ? AND status = ?", id, domain.EventPublished).First(&event).Error; err != nil {
-		notFound(c, "El evento no existe o no está publicado.")
+	var event models.Event
+	if err := s.db.Where("id = ? AND status = ?", id, models.EventPublished).First(&event).Error; err != nil {
+		utils.NotFound(c, "El evento no existe o no está publicado.")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"event": event})
 }
 
-func (s *Server) listOrganizerEvents(c *gin.Context) {
-	user, _ := currentUser(c)
-	var events []domain.Event
+func (s *Server) ListOrganizerEvents(c *gin.Context) {
+	user, _ := middleware.CurrentUser(c)
+	var events []models.Event
 	query := s.db.Order("start_at desc")
-	if user.Role != domain.RoleAdmin {
+	if user.Role != models.RoleAdmin {
 		query = query.Where("organizer_id = ?", user.ID)
 	}
 	if err := query.Find(&events).Error; err != nil {
-		serverError(c, "No se pudieron consultar tus eventos.")
+		utils.ServerError(c, "No se pudieron consultar tus eventos.")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"events": events})
 }
 
-func (s *Server) createOrganizerEvent(c *gin.Context) {
-	user, _ := currentUser(c)
+func (s *Server) CreateOrganizerEvent(c *gin.Context) {
+	user, _ := middleware.CurrentUser(c)
 	var req eventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		badRequest(c, "Los datos del evento no son válidos.")
+		utils.BadRequest(c, "Los datos del evento no son válidos.")
 		return
 	}
 
 	event, ok := buildEventFromRequest(req)
 	if !ok {
-		badRequest(c, "Título, categoría, departamento, lugar, fecha futura, precio y capacidad válida son obligatorios.")
+		utils.BadRequest(c, "Título, categoría, departamento, lugar, fecha futura, precio y capacidad válida son obligatorios.")
 		return
 	}
 	event.OrganizerID = user.ID
 	event.AvailableTickets = event.Capacity
 	if event.Status == "" {
-		event.Status = domain.EventDraft
+		event.Status = models.EventDraft
 	}
 	if !validEventStatus(event.Status) {
-		badRequest(c, "El estado del evento no es válido.")
+		utils.BadRequest(c, "El estado del evento no es válido.")
 		return
 	}
 
 	if err := s.db.Create(&event).Error; err != nil {
-		serverError(c, "No se pudo crear el evento.")
+		utils.ServerError(c, "No se pudo crear el evento.")
 		return
 	}
 
@@ -125,40 +127,40 @@ func (s *Server) createOrganizerEvent(c *gin.Context) {
 	c.JSON(http.StatusCreated, gin.H{"event": event})
 }
 
-func (s *Server) updateOrganizerEvent(c *gin.Context) {
-	user, _ := currentUser(c)
+func (s *Server) UpdateOrganizerEvent(c *gin.Context) {
+	user, _ := middleware.CurrentUser(c)
 	id, ok := parseID(c, "id")
 	if !ok {
 		return
 	}
 
-	var event domain.Event
+	var event models.Event
 	query := s.db.Where("id = ?", id)
-	if user.Role != domain.RoleAdmin {
+	if user.Role != models.RoleAdmin {
 		query = query.Where("organizer_id = ?", user.ID)
 	}
 	if err := query.First(&event).Error; err != nil {
-		notFound(c, "El evento no existe o no te pertenece.")
+		utils.NotFound(c, "El evento no existe o no te pertenece.")
 		return
 	}
 
 	var req eventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		badRequest(c, "Los datos del evento no son válidos.")
+		utils.BadRequest(c, "Los datos del evento no son válidos.")
 		return
 	}
 
 	updated, ok := buildEventFromRequest(req)
 	if !ok {
-		badRequest(c, "Los datos del evento no son válidos.")
+		utils.BadRequest(c, "Los datos del evento no son válidos.")
 		return
 	}
 	if updated.Capacity < event.Capacity-event.AvailableTickets {
-		badRequest(c, "No podés reducir la capacidad por debajo de las entradas vendidas.")
+		utils.BadRequest(c, "No podés reducir la capacidad por debajo de las entradas vendidas.")
 		return
 	}
 	if !validEventStatus(updated.Status) {
-		badRequest(c, "El estado del evento no es válido.")
+		utils.BadRequest(c, "El estado del evento no es válido.")
 		return
 	}
 
@@ -185,7 +187,7 @@ func (s *Server) updateOrganizerEvent(c *gin.Context) {
 	event.Status = updated.Status
 
 	if err := s.db.Save(&event).Error; err != nil {
-		serverError(c, "No se pudo actualizar el evento.")
+		utils.ServerError(c, "No se pudo actualizar el evento.")
 		return
 	}
 
@@ -193,17 +195,17 @@ func (s *Server) updateOrganizerEvent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"event": event})
 }
 
-func (s *Server) listAdminEvents(c *gin.Context) {
-	var events []domain.Event
+func (s *Server) ListAdminEvents(c *gin.Context) {
+	var events []models.Event
 	if err := s.db.Order("created_at desc").Find(&events).Error; err != nil {
-		serverError(c, "No se pudieron consultar los eventos.")
+		utils.ServerError(c, "No se pudieron consultar los eventos.")
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"events": events})
 }
 
-func (s *Server) updateEventStatus(c *gin.Context) {
-	user, _ := currentUser(c)
+func (s *Server) UpdateEventStatus(c *gin.Context) {
+	user, _ := middleware.CurrentUser(c)
 	id, ok := parseID(c, "id")
 	if !ok {
 		return
@@ -212,35 +214,35 @@ func (s *Server) updateEventStatus(c *gin.Context) {
 		Status string `json:"status"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil || !validEventStatus(req.Status) {
-		badRequest(c, "El estado del evento no es válido.")
+		utils.BadRequest(c, "El estado del evento no es válido.")
 		return
 	}
 
-	if err := s.db.Model(&domain.Event{}).Where("id = ?", id).Update("status", req.Status).Error; err != nil {
-		serverError(c, "No se pudo actualizar el estado del evento.")
+	if err := s.db.Model(&models.Event{}).Where("id = ?", id).Update("status", req.Status).Error; err != nil {
+		utils.ServerError(c, "No se pudo actualizar el estado del evento.")
 		return
 	}
 	s.audit(&user.ID, "EVENT_STATUS_UPDATED", "events", id, "Estado de evento actualizado a "+req.Status)
 	c.JSON(http.StatusOK, gin.H{"status": req.Status})
 }
 
-func buildEventFromRequest(req eventRequest) (domain.Event, bool) {
+func buildEventFromRequest(req eventRequest) (models.Event, bool) {
 	startAt, err := time.Parse(time.RFC3339, req.StartAt)
 	if err != nil {
-		return domain.Event{}, false
+		return models.Event{}, false
 	}
 	ticketType := strings.TrimSpace(req.TicketType)
 	if ticketType == "" {
 		ticketType = "General"
 	}
 	if req.Title == "" || req.Category == "" || req.Department == "" || req.Venue == "" || req.Capacity <= 0 || req.PriceCents < 0 || startAt.Before(time.Now()) {
-		return domain.Event{}, false
+		return models.Event{}, false
 	}
 	status := req.Status
 	if status == "" {
-		status = domain.EventDraft
+		status = models.EventDraft
 	}
-	return domain.Event{
+	return models.Event{
 		Title:               strings.TrimSpace(req.Title),
 		Description:         strings.TrimSpace(req.Description),
 		ExtendedDescription: strings.TrimSpace(req.ExtendedDescription),
@@ -265,7 +267,7 @@ func buildEventFromRequest(req eventRequest) (domain.Event, bool) {
 
 func validEventStatus(status string) bool {
 	switch status {
-	case domain.EventDraft, domain.EventPublished, domain.EventPaused, domain.EventCancelled, domain.EventFinished:
+	case models.EventDraft, models.EventPublished, models.EventPaused, models.EventCancelled, models.EventFinished:
 		return true
 	default:
 		return false
@@ -275,7 +277,7 @@ func validEventStatus(status string) bool {
 func parseID(c *gin.Context, param string) (uint, bool) {
 	value, err := strconv.ParseUint(c.Param(param), 10, 64)
 	if err != nil {
-		badRequest(c, "El identificador no es válido.")
+		utils.BadRequest(c, "El identificador no es válido.")
 		return 0, false
 	}
 	return uint(value), true

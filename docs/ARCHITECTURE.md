@@ -30,13 +30,14 @@ Current backend structure:
 ```text
 backend/
 |-- cmd/main.go
-`-- internal/
-    |-- config/
-    |-- database/
-    |-- domain/
-    |-- httpapi/
-    |-- security/
-    `-- seed/
+|-- config/
+|-- database/
+|-- handlers/
+|-- middleware/
+|-- models/
+|-- routes/
+|-- services/
+`-- utils/
 ```
 
 ### `cmd/main.go`
@@ -49,7 +50,7 @@ Application entrypoint:
 4. Runs seed data when `SEED_DATA=true`.
 5. Starts the Gin router.
 
-### `internal/config`
+### `config`
 
 Reads environment variables:
 
@@ -58,11 +59,12 @@ Reads environment variables:
 - `JWT_SECRET`
 - `SEED_DATA`
 
-### `internal/database`
+### `database`
 
 Opens the GORM PostgreSQL connection and runs AutoMigrate for the main domain models.
+It also contains the demo seed routine used when `SEED_DATA=true`.
 
-### `internal/domain`
+### `models`
 
 Defines models, roles, and states:
 
@@ -73,19 +75,28 @@ Defines models, roles, and states:
 - `Ticket`
 - `AuditLog`
 
-### `internal/httpapi`
+### `handlers`
 
 Contains:
 
-- Router setup.
 - HTTP handlers.
+- Consistent JSON handler responses through shared helpers.
+
+### `middleware`
+
+Contains:
+
 - Auth middleware.
 - Role middleware.
 - Approved organizer middleware.
 - CORS middleware.
-- Consistent JSON error responses.
 
-### `internal/security`
+### `routes`
+
+Builds the Gin router, health endpoints and `/api/v1` route groups without
+changing public URLs.
+
+### `services`
 
 Contains:
 
@@ -93,9 +104,9 @@ Contains:
 - JWT HS256 generation and parsing.
 - Signed ticket code generation and validation.
 
-### `internal/seed`
+### `utils`
 
-Creates or ensures demo users, including USER, ORGANIZER, VALIDATOR, and ADMIN, plus demo events when `SEED_DATA=true`.
+Contains shared HTTP response helpers used by handlers and middleware.
 
 ## Frontend pages
 
@@ -233,7 +244,7 @@ This is intentionally a simulated paid purchase. Mercado Pago and webhooks are n
 For every created ticket:
 
 1. A placeholder ticket row is created to obtain the database ID.
-2. `security.NewTicketCode` creates a code.
+2. `services.NewTicketCode` creates a code.
 3. Code format begins with `MC-`.
 4. Payload includes ticket ID and random bytes.
 5. Payload is signed with HMAC-SHA256 using `JWT_SECRET`.
@@ -375,7 +386,7 @@ Backend error responses use a consistent JSON shape:
 }
 ```
 
-Common helpers exist in `internal/httpapi/responses.go`:
+Common helpers exist in `utils/responses.go`:
 
 - `badRequest`
 - `conflict`

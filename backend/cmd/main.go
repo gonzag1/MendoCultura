@@ -3,10 +3,9 @@ package main
 import (
 	"log"
 
-	"MendoCultura/internal/config"
-	"MendoCultura/internal/database"
-	"MendoCultura/internal/httpapi"
-	"MendoCultura/internal/seed"
+	"MendoCultura/config"
+	"MendoCultura/database"
+	"MendoCultura/routes"
 )
 
 func main() {
@@ -22,12 +21,12 @@ func main() {
 	}
 
 	if cfg.SeedData {
-		if err := seed.Run(db); err != nil {
+		if err := database.Seed(db); err != nil {
 			log.Fatalf("database seed failed: %v", err)
 		}
 	}
 
-	router := httpapi.NewRouter(db, cfg)
+	router := routes.NewRouter(db, cfg)
 	if err := router.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("server failed: %v", err)
 	}

@@ -133,7 +133,14 @@ Con `SEED_DATA=true`, el backend crea datos iniciales si la base está vacía.
 ```text
 backend/              Backend Go
   cmd/main.go         Punto de entrada
-  internal/           Config, DB, dominio, API HTTP, seguridad y seeds
+  config/             Variables de entorno y configuración
+  database/           Conexión, AutoMigrate y datos iniciales
+  models/             Modelos de dominio y estados
+  handlers/           Handlers HTTP por recurso
+  middleware/         Autenticación, roles, organizador aprobado y CORS
+  routes/             Armado del router y endpoints
+  services/           Helpers de seguridad, JWT, bcrypt y códigos de ticket
+  utils/              Respuestas JSON compartidas
 frontend/             Frontend Astro
   src/pages/          Páginas públicas, paneles y tickets
   src/layouts/        Layout base con navegación por rol
@@ -195,9 +202,12 @@ Backend:
 
 ```powershell
 cd "C:\Users\ASUS\OneDrive\Documentos\MendoCultura\backend"
-$env:GOCACHE="C:\Users\ASUS\OneDrive\Documentos\MendoCultura\backend\.gocache-test"
 go test ./...
 ```
+
+No configures `GOCACHE` dentro del repositorio. Las carpetas `.gocache*`,
+`frontend/node_modules`, `frontend/dist` y `frontend/.astro` son generadas y
+deben quedar fuera del árbol versionable.
 
 Frontend:
 

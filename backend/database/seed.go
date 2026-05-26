@@ -1,23 +1,23 @@
-package seed
+package database
 
 import (
 	"time"
 
-	"MendoCultura/internal/domain"
-	"MendoCultura/internal/security"
+	"MendoCultura/models"
+	"MendoCultura/services"
 
 	"gorm.io/gorm"
 )
 
-func Run(db *gorm.DB) error {
+func Seed(db *gorm.DB) error {
 	return db.Transaction(func(tx *gorm.DB) error {
-		user, err := ensureUser(tx, "Usuario Demo", "usuario@mendocultura.local", "usuario123", "30111222", domain.RoleUser)
+		user, err := ensureUser(tx, "Usuario Demo", "usuario@mendocultura.local", "usuario123", "30111222", models.RoleUser)
 		if err != nil {
 			return err
 		}
 		_ = user
 
-		organizer, err := ensureUser(tx, "Bodega Demo", "organizador@mendocultura.local", "organizador123", "30999888", domain.RoleOrganizer)
+		organizer, err := ensureUser(tx, "Bodega Demo", "organizador@mendocultura.local", "organizador123", "30999888", models.RoleOrganizer)
 		if err != nil {
 			return err
 		}
@@ -25,13 +25,13 @@ func Run(db *gorm.DB) error {
 			return err
 		}
 
-		validator, err := ensureUser(tx, "Validador Demo", "validador@mendocultura.local", "validador123", "30777888", domain.RoleValidator)
+		validator, err := ensureUser(tx, "Validador Demo", "validador@mendocultura.local", "validador123", "30777888", models.RoleValidator)
 		if err != nil {
 			return err
 		}
 		_ = validator
 
-		admin, err := ensureUser(tx, "Admin Demo", "admin@mendocultura.local", "admin123", "30000000", domain.RoleAdmin)
+		admin, err := ensureUser(tx, "Admin Demo", "admin@mendocultura.local", "admin123", "30000000", models.RoleAdmin)
 		if err != nil {
 			return err
 		}
@@ -41,43 +41,43 @@ func Run(db *gorm.DB) error {
 			return err
 		}
 
-		return tx.FirstOrCreate(&domain.AuditLog{}, domain.AuditLog{Action: "SEED_CREATED", Entity: "system", Detail: "Datos de prueba iniciales creados"}).Error
+		return tx.FirstOrCreate(&models.AuditLog{}, models.AuditLog{Action: "SEED_CREATED", Entity: "system", Detail: "Datos de prueba iniciales creados"}).Error
 	})
 }
 
-func ensureUser(tx *gorm.DB, name string, email string, password string, dni string, role string) (domain.User, error) {
-	var user domain.User
+func ensureUser(tx *gorm.DB, name string, email string, password string, dni string, role string) (models.User, error) {
+	var user models.User
 	if err := tx.Where("email = ?", email).First(&user).Error; err == nil {
 		return user, nil
 	} else if err != gorm.ErrRecordNotFound {
-		return domain.User{}, err
+		return models.User{}, err
 	}
 
-	hash, err := security.HashPassword(password)
+	hash, err := services.HashPassword(password)
 	if err != nil {
-		return domain.User{}, err
+		return models.User{}, err
 	}
 
-	user = domain.User{
+	user = models.User{
 		Name:         name,
 		Email:        email,
 		PasswordHash: hash,
 		DNI:          dni,
 		Role:         role,
-		Status:       domain.AccountActive,
+		Status:       models.AccountActive,
 	}
 	return user, tx.Create(&user).Error
 }
 
 func ensureOrganizerProfile(tx *gorm.DB, organizerID uint) error {
-	var profile domain.OrganizerProfile
+	var profile models.OrganizerProfile
 	if err := tx.Where("user_id = ?", organizerID).First(&profile).Error; err == nil {
 		return nil
 	} else if err != gorm.ErrRecordNotFound {
 		return err
 	}
 
-	profile = domain.OrganizerProfile{
+	profile = models.OrganizerProfile{
 		UserID:       organizerID,
 		BusinessName: "Bodega Demo Mendoza",
 		TaxID:        "30-70000000-1",
@@ -89,14 +89,14 @@ func ensureOrganizerProfile(tx *gorm.DB, organizerID uint) error {
 
 func ensureEvents(tx *gorm.DB, organizerID uint) error {
 	var count int64
-	if err := tx.Model(&domain.Event{}).Count(&count).Error; err != nil {
+	if err := tx.Model(&models.Event{}).Count(&count).Error; err != nil {
 		return err
 	}
 	if count > 0 {
 		return nil
 	}
 
-	events := []domain.Event{
+	events := []models.Event{
 		{
 			OrganizerID:         organizerID,
 			Title:               "Fiesta de la Vendimia Joven",
@@ -115,7 +115,7 @@ func ensureEvents(tx *gorm.DB, organizerID uint) error {
 			PriceCents:          850000,
 			Capacity:            220,
 			AvailableTickets:    220,
-			Status:              domain.EventPublished,
+			Status:              models.EventPublished,
 		},
 		{
 			OrganizerID:         organizerID,
@@ -135,7 +135,7 @@ func ensureEvents(tx *gorm.DB, organizerID uint) error {
 			PriceCents:          1500000,
 			Capacity:            80,
 			AvailableTickets:    80,
-			Status:              domain.EventPublished,
+			Status:              models.EventPublished,
 		},
 		{
 			OrganizerID:         organizerID,
@@ -155,7 +155,7 @@ func ensureEvents(tx *gorm.DB, organizerID uint) error {
 			PriceCents:          700000,
 			Capacity:            300,
 			AvailableTickets:    300,
-			Status:              domain.EventPublished,
+			Status:              models.EventPublished,
 		},
 		{
 			OrganizerID:         organizerID,
@@ -175,7 +175,7 @@ func ensureEvents(tx *gorm.DB, organizerID uint) error {
 			PriceCents:          450000,
 			Capacity:            260,
 			AvailableTickets:    260,
-			Status:              domain.EventPublished,
+			Status:              models.EventPublished,
 		},
 		{
 			OrganizerID:         organizerID,
@@ -195,7 +195,7 @@ func ensureEvents(tx *gorm.DB, organizerID uint) error {
 			PriceCents:          350000,
 			Capacity:            120,
 			AvailableTickets:    120,
-			Status:              domain.EventPublished,
+			Status:              models.EventPublished,
 		},
 		{
 			OrganizerID:         organizerID,
@@ -215,7 +215,7 @@ func ensureEvents(tx *gorm.DB, organizerID uint) error {
 			PriceCents:          2100000,
 			Capacity:            60,
 			AvailableTickets:    60,
-			Status:              domain.EventPublished,
+			Status:              models.EventPublished,
 		},
 		{
 			OrganizerID:         organizerID,
@@ -235,7 +235,7 @@ func ensureEvents(tx *gorm.DB, organizerID uint) error {
 			PriceCents:          600000,
 			Capacity:            180,
 			AvailableTickets:    180,
-			Status:              domain.EventPublished,
+			Status:              models.EventPublished,
 		},
 		{
 			OrganizerID:         organizerID,
@@ -255,7 +255,7 @@ func ensureEvents(tx *gorm.DB, organizerID uint) error {
 			PriceCents:          300000,
 			Capacity:            500,
 			AvailableTickets:    500,
-			Status:              domain.EventPublished,
+			Status:              models.EventPublished,
 		},
 	}
 

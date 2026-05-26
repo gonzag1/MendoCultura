@@ -72,6 +72,7 @@ Priority values:
 - [x] DONE - Improve admin dashboard with clearer user, organizer, event, metric and audit views.
 - [x] DONE - Improve frontend form validation before sending API requests.
 - [x] DONE - Add clearer handling for expired sessions in the frontend.
+- [x] DONE - Reorganize backend folders into config, database, models, handlers, middleware, routes, services and utils without changing endpoints.
 - [ ] TODO - Add a clear screen for approving or rejecting organizers.
 - [ ] TODO - Document admin and organizer workflows with short examples.
 - [ ] TODO - Review CORS configuration before any non-local deployment.

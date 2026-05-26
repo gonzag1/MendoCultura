@@ -1,7 +1,7 @@
 package database
 
 import (
-	"MendoCultura/internal/domain"
+	"MendoCultura/models"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -13,11 +13,11 @@ func Open(databaseURL string) (*gorm.DB, error) {
 
 func Migrate(db *gorm.DB) error {
 	return db.AutoMigrate(
-		&domain.User{},
-		&domain.OrganizerProfile{},
-		&domain.Event{},
-		&domain.Purchase{},
-		&domain.Ticket{},
-		&domain.AuditLog{},
+		&models.User{},
+		&models.OrganizerProfile{},
+		&models.Event{},
+		&models.Purchase{},
+		&models.Ticket{},
+		&models.AuditLog{},
 	)
 }

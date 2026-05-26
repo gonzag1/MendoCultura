@@ -14,7 +14,7 @@
 | R-08 | Mercado Pago and webhooks are more complex than expected. | Alta | Alto | P3 | Keep payments simulated now; later add provider abstraction, webhook signature validation, idempotency, and pending-ticket TTL. | Aceptado |
 | R-09 | Frontend validation and error messages are not clear enough. | Media | Medio | P1 | Main frontend pages show clearer Spanish messages for missing forms, sessions, rejected roles, backend errors, network failures and empty states. | Mitigado |
 | R-10 | Not enough automated tests for critical flows. | Alta | Alto | P1 | Add tests for security helpers, auth middleware, purchase transaction, role permissions, and check-in. | Pendiente |
-| R-11 | OneDrive/Windows path or permission issues affect Go, npm, Docker, or Git. | Media | Medio | P1 | Use local Go cache when required; document Windows PowerShell commands. | Abierto |
+| R-11 | OneDrive/Windows path or permission issues affect Go, npm, Docker, or Git. | Media | Medio | P1 | Use the normal system cache or a temporary path outside the repository; `.gocache*` folders must not be created or versioned inside the project. README documents this. | Abierto |
 | R-12 | Future inconsistencies if ROADMAP.md is not updated after changes. | Media | Medio | P1 | Roadmap was updated after the demo UX improvement pass; future work must keep it current. | Mitigado |
 | R-13 | CORS is permissive for local development. | Media | Medio | P2 | Keep permissive CORS for demo only; restrict origins before production deployment. | Aceptado |
 | R-14 | GORM AutoMigrate may be insufficient for controlled production schema changes. | Media | Medio | P2 | Use AutoMigrate for demo; introduce explicit migrations before production. | Aceptado |
@@ -29,7 +29,7 @@
 ## Current critical risks
 
 1. **Automated tests are still limited**: backend compiles and frontend builds, but critical business flows still need automated tests.
-2. **OneDrive/Windows tooling can still be slow**: `go test ./...` may require a local `GOCACHE` path for reliable execution.
+2. **OneDrive/Windows tooling can still be slow**: `go test ./...` should use the normal system cache or a temporary path outside the repository, never a `.gocache*` folder inside the project.
 3. **Demo vs full report scope must stay explicit**: Mercado Pago, PDF, email, camera QR, and offline mode are still deferred.
 4. **CORS remains permissive for local development**: restrict it before production deployment.
 
