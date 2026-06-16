@@ -1,18 +1,25 @@
 package handlers
 
 import (
-	"MendoCultura/middleware"
-	"MendoCultura/utils"
+	"crypto/rand"
+	"encoding/hex"
+	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 	"unicode"
 
+	"MendoCultura/middleware"
 	"MendoCultura/models"
+	"MendoCultura/utils"
 
 	"github.com/gin-gonic/gin"
 )
+
+const maxEventImageUploadBytes = 4 << 20
 
 type eventRequest struct {
 	Title               string   `json:"title"`
@@ -195,6 +202,71 @@ func (s *Server) UpdateOrganizerEvent(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"event": event})
 }
 
+func (s *Server) UploadOrganizerEventImage(c *gin.Context) {
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxEventImageUploadBytes+1024)
+	file, err := c.FormFile("image")
+	if err != nil {
+		utils.BadRequest(c, "Seleccioná una imagen para subir.")
+		return
+	}
+	if file.Size <= 0 || file.Size > maxEventImageUploadBytes {
+		utils.BadRequest(c, "La imagen debe pesar hasta 4 MB.")
+		return
+	}
+
+	extension := strings.ToLower(filepath.Ext(file.Filename))
+	allowedExtensions := map[string]bool{".jpg": true, ".jpeg": true, ".png": true, ".webp": true}
+	if !allowedExtensions[extension] {
+		utils.BadRequest(c, "El archivo debe ser una imagen JPG, PNG o WEBP.")
+		return
+	}
+
+	source, err := file.Open()
+	if err != nil {
+		utils.BadRequest(c, "No se pudo leer la imagen.")
+		return
+	}
+	defer source.Close()
+
+	buffer := make([]byte, 512)
+	readBytes, _ := source.Read(buffer)
+	contentType := http.DetectContentType(buffer[:readBytes])
+	allowedTypes := map[string]bool{
+		"image/jpeg": true,
+		"image/png":  true,
+		"image/webp": true,
+	}
+	if !allowedTypes[contentType] {
+		utils.BadRequest(c, "El archivo seleccionado no parece ser una imagen válida.")
+		return
+	}
+
+	uploadDir := filepath.Join("uploads", "events")
+	if err := os.MkdirAll(uploadDir, 0o755); err != nil {
+		utils.ServerError(c, "No se pudo preparar la carpeta de imágenes.")
+		return
+	}
+
+	filename := fmt.Sprintf("%d-%s%s", time.Now().UnixNano(), randomHex(6), extension)
+	destination := filepath.Join(uploadDir, filename)
+	if err := c.SaveUploadedFile(file, destination); err != nil {
+		utils.ServerError(c, "No se pudo guardar la imagen.")
+		return
+	}
+
+	scheme := "http"
+	if c.Request.TLS != nil {
+		scheme = "https"
+	}
+	if forwardedProto := c.GetHeader("X-Forwarded-Proto"); forwardedProto != "" {
+		scheme = forwardedProto
+	}
+
+	c.JSON(http.StatusCreated, gin.H{
+		"imageUrl": fmt.Sprintf("%s://%s/uploads/events/%s", scheme, c.Request.Host, filename),
+	})
+}
+
 func (s *Server) ListAdminEvents(c *gin.Context) {
 	var events []models.Event
 	if err := s.db.Order("created_at desc").Find(&events).Error; err != nil {
@@ -288,6 +360,9 @@ func normalizeText(value string) string {
 	var builder strings.Builder
 	builder.Grow(len(value))
 	for _, r := range value {
+		if unicode.Is(unicode.Mn, r) {
+			continue
+		}
 		switch r {
 		case 'á', 'à', 'ä', 'â':
 			r = 'a'
@@ -308,4 +383,12 @@ func normalizeText(value string) string {
 		builder.WriteRune(r)
 	}
 	return strings.Join(strings.Fields(builder.String()), " ")
+}
+
+func randomHex(bytesCount int) string {
+	buffer := make([]byte, bytesCount)
+	if _, err := rand.Read(buffer); err != nil {
+		return "demo"
+	}
+	return hex.EncodeToString(buffer)
 }

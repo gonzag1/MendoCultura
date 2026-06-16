@@ -49,6 +49,83 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       return '<span class="badge success">Publicado</span>';
     }
 
+    function onlyDigits(value = '') {
+      return String(value).replace(/\D/g, '');
+    }
+
+    function passesLuhn(value) {
+      const digits = onlyDigits(value);
+      let sum = 0;
+      let shouldDouble = false;
+      for (let index = digits.length - 1; index >= 0; index -= 1) {
+        let digit = Number(digits[index]);
+        if (shouldDouble) {
+          digit *= 2;
+          if (digit > 9) digit -= 9;
+        }
+        sum += digit;
+        shouldDouble = !shouldDouble;
+      }
+      return digits.length > 0 && sum % 10 === 0;
+    }
+
+    function expirationIsValid(value) {
+      const match = String(value).trim().match(/^(\d{1,2})\s*\/\s*(\d{2}|\d{4})$/);
+      if (!match) return false;
+      const month = Number(match[1]);
+      let year = Number(match[2]);
+      if (month < 1 || month > 12) return false;
+      if (year < 100) year += 2000;
+      const now = new Date();
+      const expiresAt = new Date(year, month, 0, 23, 59, 59);
+      return expiresAt >= new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    function setFieldError(id, message = '') {
+      const input = document.querySelector(`#${id}`);
+      const error = document.querySelector(`#${id}Error`);
+      input?.classList.toggle('input-error', Boolean(message));
+      if (error) error.textContent = message;
+    }
+
+    function validatePaymentForm() {
+      const values = {
+        cardHolder: document.querySelector('#cardHolder')?.value.trim() || '',
+        fakeCard: document.querySelector('#fakeCard')?.value.trim() || '',
+        expiration: document.querySelector('#expiration')?.value.trim() || '',
+        cvv: document.querySelector('#cvv')?.value.trim() || '',
+        dni: document.querySelector('#dni')?.value.trim() || '',
+        email: document.querySelector('#email')?.value.trim() || ''
+      };
+      const errors = {};
+      const cardDigits = onlyDigits(values.fakeCard);
+      const cardWithoutSpaces = values.fakeCard.replace(/\s/g, '');
+      const cvvDigits = onlyDigits(values.cvv);
+      const dniDigits = onlyDigits(values.dni);
+
+      if (!values.cardHolder) errors.cardHolder = 'Ingresá el nombre del titular.';
+      if (!values.fakeCard) errors.fakeCard = 'Ingresá el número de tarjeta.';
+      else if (cardDigits !== cardWithoutSpaces) errors.fakeCard = 'El número de tarjeta debe contener solo números.';
+      else if (cardDigits.length !== 16) errors.fakeCard = 'El número de tarjeta debe tener 16 dígitos.';
+      else if (!passesLuhn(cardDigits)) errors.fakeCard = 'Revisá el número de tarjeta ficticio.';
+
+      if (!values.expiration) errors.expiration = 'Ingresá la fecha de vencimiento.';
+      else if (!expirationIsValid(values.expiration)) errors.expiration = 'La fecha de vencimiento no es válida.';
+
+      if (!values.cvv) errors.cvv = 'Ingresá el CVV.';
+      else if (cvvDigits !== values.cvv) errors.cvv = 'El CVV debe contener solo números.';
+      else if (![3, 4].includes(cvvDigits.length)) errors.cvv = 'El CVV debe tener 3 o 4 números.';
+
+      if (!values.dni) errors.dni = 'Ingresá un DNI válido.';
+      else if (dniDigits !== values.dni || dniDigits.length < 7 || dniDigits.length > 9) errors.dni = 'Ingresá un DNI válido.';
+
+      if (!values.email) errors.email = 'Ingresá un email.';
+      else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(values.email)) errors.email = 'Ingresá un email válido.';
+
+      ['cardHolder', 'fakeCard', 'expiration', 'cvv', 'dni', 'email'].forEach((id) => setFieldError(id, errors[id] || ''));
+      return { isValid: Object.keys(errors).length === 0, errors };
+    }
+
     function renderCheckout() {
       const event = currentEvent;
       const unitPrice = event.priceCents;
@@ -96,16 +173,19 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <aside class="checkout-card sticky">
             <h2>Resumen de compra</h2>
             ${stepHeader}
-            <p><strong>${escapeHtml(event.title)}</strong><br>${dateFormat.format(new Date(event.startAt))}</p>
-            <p>Tipo: <strong>${escapeHtml(event.ticketType || 'General')}</strong></p>
-            <p>Cantidad: <strong>${selectedQuantity}</strong></p>
-            <p>Precio unitario: <strong>${money.format(unitPrice / 100)}</strong></p>
-            <p>Cargo de servicio simulado: <strong>${money.format(fee / 100)}</strong></p>
-            <div class="price">Total: ${money.format(total / 100)}</div>
+            <div class="checkout-summary">
+              <p><strong>${escapeHtml(event.title)}</strong><br>${dateFormat.format(new Date(event.startAt))}</p>
+              <p>Tipo: <strong>${escapeHtml(event.ticketType || 'General')}</strong></p>
+              <p>Cantidad: <strong>${selectedQuantity}</strong></p>
+              <p>Precio unitario: <strong>${money.format(unitPrice / 100)}</strong></p>
+              <p>Cargo de servicio simulado: <strong>${money.format(fee / 100)}</strong></p>
+              <div class="checkout-total"><span>Total</span><strong class="price">${money.format(total / 100)}</strong></div>
+            </div>
             <div class="actions">
               <button class="secondary" id="backToSelector">Volver</button>
               <button id="continueToPayment">Ir al pago</button>
             </div>
+            <div id="checkoutMessage" style="margin-top:14px;"></div>
           </aside>
         `;
       }
@@ -116,14 +196,14 @@ import BaseLayout from '../layouts/BaseLayout.astro';
             <h2>Pago simulado</h2>
             ${stepHeader}
             <p class="notice">No ingreses datos reales. Esta pantalla no guarda número de tarjeta ni CVV.</p>
-            <label>Nombre del titular <input id="cardHolder" autocomplete="off" /></label>
-            <label>Número de tarjeta ficticio <input id="fakeCard" inputmode="numeric" maxlength="19" placeholder="4242 4242 4242 4242" autocomplete="off" /></label>
+            <label>Nombre del titular <input id="cardHolder" autocomplete="off" /><span id="cardHolderError" class="field-error"></span></label>
+            <label>Número de tarjeta ficticio <input id="fakeCard" inputmode="numeric" maxlength="19" placeholder="4242 4242 4242 4242" autocomplete="off" /><span id="fakeCardError" class="field-error"></span></label>
             <div class="form-grid">
-              <label>Vencimiento <input id="expiration" placeholder="12/30" autocomplete="off" /></label>
-              <label>CVV <input id="cvv" inputmode="numeric" maxlength="4" autocomplete="off" /></label>
+              <label>Vencimiento <input id="expiration" placeholder="12/30" autocomplete="off" /><span id="expirationError" class="field-error"></span></label>
+              <label>CVV <input id="cvv" inputmode="numeric" maxlength="4" autocomplete="off" /><span id="cvvError" class="field-error"></span></label>
             </div>
-            <label>DNI <input id="dni" inputmode="numeric" autocomplete="off" /></label>
-            <label>Email <input id="email" type="email" autocomplete="email" /></label>
+            <label>DNI <input id="dni" inputmode="numeric" autocomplete="off" /><span id="dniError" class="field-error"></span></label>
+            <label>Email <input id="email" type="email" autocomplete="email" /><span id="emailError" class="field-error"></span></label>
             <div class="actions">
               <button class="secondary" id="backToSummary">Volver</button>
               <button id="confirmPurchase">Confirmar compra</button>
@@ -137,7 +217,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <aside class="checkout-card sticky">
           <h2>Compra confirmada</h2>
           ${stepHeader}
-          <p class="notice success">Tu compra simulada fue aprobada. Ya podés ver tus entradas y el QR.</p>
+          <div class="success-panel">
+            <strong>Pago simulado aprobado</strong>
+            <p>Tu compra fue confirmada. Ya podés ver tus entradas y el QR.</p>
+          </div>
           <div class="actions">
             <a class="button" href="/tickets">Ver mis entradas</a>
             <a class="button secondary" href="/events">Explorar más eventos</a>
@@ -252,16 +335,15 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         message.innerHTML = '<p class="notice error">Debés iniciar sesión para comprar. <a href="/login">Iniciar sesión</a></p>';
         return;
       }
-      const required = ['cardHolder', 'fakeCard', 'expiration', 'cvv', 'dni', 'email'];
-      const missing = required.some((id) => !document.querySelector(`#${id}`).value.trim());
-      if (missing) {
-        message.innerHTML = '<p class="notice error">Completá todos los datos del pago simulado.</p>';
+      const validation = validatePaymentForm();
+      if (!validation.isValid) {
+        message.innerHTML = '<p class="notice error">Revisá los datos antes de continuar.</p>';
         return;
       }
 
       const button = document.querySelector('#confirmPurchase');
       button.disabled = true;
-      message.innerHTML = '<p class="notice">Procesando pago simulado...</p>';
+      message.innerHTML = '<p class="notice">Procesando pago...</p>';
       await new Promise((resolve) => setTimeout(resolve, 900));
 
       try {

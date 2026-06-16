@@ -9,7 +9,7 @@
 | R-03 | Double validation of tickets. | Media | Alto | P0 | Current check-in locks the ticket, rejects USED/CANCELLED/non-VALID states, then updates to USED. Add tests later. | Mitigado |
 | R-04 | JWT remains valid after user is suspended. | Media | Alto | P0 | Auth middleware loads the user from DB and checks ACTIVE status on protected requests. | Mitigado |
 | R-05 | Environment variables are misconfigured. | Media | Alto | P0 | `.env.example` files were reviewed and README includes Docker and manual PowerShell setup. Recheck on a fresh machine later. | Mitigado |
-| R-06 | Moderate npm vulnerability detected by `npm install`. | Media | Medio | P1 | `npm audit --audit-level=moderate` now reports 0 vulnerabilities. | Cerrado |
+| R-06 | npm vulnerabilities detected by `npm install`. | Media | Medio | P1 | Latest `npm install` reported 1 moderate and 3 high vulnerabilities. `npm audit --json` could not fetch details in this environment, so this needs a follow-up with registry/cache access before changing dependencies. | Abierto |
 | R-07 | Difference between current demo and full technical report creates false expectations. | Alta | Alto | P1 | Clearly document simulated purchase and deferred advanced features in README, PROJECT_CONTEXT, and ROADMAP. | Mitigado |
 | R-08 | Mercado Pago and webhooks are more complex than expected. | Alta | Alto | P3 | Keep payments simulated now; later add provider abstraction, webhook signature validation, idempotency, and pending-ticket TTL. | Aceptado |
 | R-09 | Frontend validation and error messages are not clear enough. | Media | Medio | P1 | Main frontend pages show clearer Spanish messages for missing forms, sessions, rejected roles, backend errors, network failures and empty states. | Mitigado |
@@ -25,6 +25,7 @@
 | R-19 | Simulated checkout looks too unrealistic for demo. | Media | Medio | P1 | Event detail now uses a multi-step simulated checkout without storing card data. | Mitigado |
 | R-20 | Navigation shows links to roles that should not access them. | Media | Alto | P1 | Header visibility is driven by `/me`/localStorage role and backend RBAC remains authoritative on protected endpoints. | Mitigado |
 | R-21 | UI is too empty or unclear for demo stakeholders. | Media | Medio | P1 | Frontend was redesigned with modern cards, hero, responsive layout, empty states, badges and clearer dashboards. | Mitigado |
+| R-22 | Uploaded demo images may be lost if local generated files are deleted. | Media | Medio | P2 | Uploaded files are ignored by Git and persisted in Docker with `backend_uploads`; for backup/export, copy `backend/uploads/events` or the Docker volume. | Mitigado |
 
 ## Current critical risks
 

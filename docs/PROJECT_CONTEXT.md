@@ -69,6 +69,7 @@ Implemented in the current codebase:
 - Online ticket validation.
 - Prevention of double validation.
 - Organizer panel with expanded event create/edit fields and sales cards.
+- Organizer panel with main event image upload from a local file, preview before saving, and URL fallback.
 - Administrator panel with metrics, users, organizers, events and audit views.
 - Basic metrics.
 - Basic audit log.
@@ -76,6 +77,7 @@ Implemented in the current codebase:
 - Astro frontend with user-visible text in Spanish and corrected UTF-8 encoding.
 - Role-aware header navigation based on stored session and `/me` validation.
 - Case-insensitive and accent-insensitive catalog filters.
+- Global local Playfair Display typography and demo-focused visual polish for footer, checkout, event cards and forms.
 - Mendoza demo seed events with images, categories, locations and richer descriptions.
 - Clearer frontend error messages for network failures, invalid forms, protected pages, and expired/invalid sessions.
 - README with verified Docker Compose and manual PowerShell instructions plus demo users.

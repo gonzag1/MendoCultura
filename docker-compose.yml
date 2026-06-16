@@ -30,6 +30,8 @@ services:
       SEED_DATA: "true"
     ports:
       - "8080:8080"
+    volumes:
+      - backend_uploads:/app/uploads
 
   frontend:
     build:
@@ -44,3 +46,4 @@ services:
 
 volumes:
   postgres_data:
+  backend_uploads:

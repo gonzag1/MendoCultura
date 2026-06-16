@@ -29,7 +29,13 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <label>Departamento <select id="department"></select></label>
         <label>Venue <input id="venue" /></label>
         <label class="full">Dirección <input id="address" /></label>
-        <label class="full">Imagen principal <input id="imageUrl" placeholder="https://..." /></label>
+        <label class="full">Pegar URL de imagen <input id="imageUrl" placeholder="https://..." /></label>
+        <div class="full image-upload-box">
+          <strong>O subir desde mi equipo</strong>
+          <p class="muted">Formatos admitidos: JPG, PNG o WEBP. Tamaño máximo: 4 MB.</p>
+          <input id="imageFile" type="file" accept="image/jpeg,image/png,image/webp" />
+          <div id="imagePreview" class="image-preview" aria-live="polite"></div>
+        </div>
         <label class="full">Galería de imágenes <textarea id="galleryImages" placeholder="URLs separadas por coma"></textarea></label>
         <label class="full">Mapa iframe o URL opcional <input id="mapUrl" placeholder="Opcional: se genera con dirección si queda vacío" /></label>
         <label>Fecha <input id="startAt" type="datetime-local" /></label>
@@ -70,7 +76,11 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     const saveResult = document.querySelector('#saveResult');
     const saveButton = document.querySelector('#saveButton');
     const formTitle = document.querySelector('#formTitle');
+    const imageUrlInput = document.querySelector('#imageUrl');
+    const imageFileInput = document.querySelector('#imageFile');
+    const imagePreview = document.querySelector('#imagePreview');
     let editingEventId = null;
+    let selectedImageFile = null;
 
     const categories = ['Vendimia', 'Bodegas', 'Recitales', 'Festivales', 'Teatro', 'Deportes', 'Gastronomía', 'Universitarios', 'Congresos', 'Exposiciones', 'Fiestas', 'Música', 'Turismo', 'Cultura', 'Arte', 'Cine', 'Danza', 'Infantil', 'Charlas', 'Ferias', 'Otros'];
     const departments = ['Ciudad de Mendoza', 'Godoy Cruz', 'Guaymallén', 'Las Heras', 'Lavalle', 'Luján de Cuyo', 'Maipú', 'Junín', 'Rivadavia', 'San Martín', 'Santa Rosa', 'La Paz', 'Tunuyán', 'Tupungato', 'San Carlos', 'San Rafael', 'General Alvear', 'Malargüe'];
@@ -88,6 +98,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       return { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` };
     }
 
+    function authOnlyHeaders() {
+      return { Authorization: `Bearer ${token}` };
+    }
+
     function showSaveMessage(type, message) {
       saveResult.innerHTML = `<p class="notice ${type}">${message}</p>`;
     }
@@ -102,6 +116,43 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       } catch {
         return {};
       }
+    }
+
+    function renderImagePreview(src) {
+      if (!src) {
+        imagePreview.classList.remove('is-visible');
+        imagePreview.innerHTML = '';
+        return;
+      }
+      imagePreview.classList.add('is-visible');
+      imagePreview.innerHTML = `<img src="${escapeHtml(src)}" alt="Vista previa de la imagen del evento" />`;
+    }
+
+    async function uploadSelectedImageIfNeeded() {
+      if (!selectedImageFile) return imageUrlInput.value.trim();
+      if (!selectedImageFile.type.startsWith('image/')) {
+        throw new Error('El archivo seleccionado debe ser una imagen.');
+      }
+      if (selectedImageFile.size > 4 * 1024 * 1024) {
+        throw new Error('La imagen debe pesar hasta 4 MB.');
+      }
+
+      const formData = new FormData();
+      formData.append('image', selectedImageFile);
+      const response = await fetch(`${apiUrl}/organizer/events/upload-image`, {
+        method: 'POST',
+        headers: authOnlyHeaders(),
+        body: formData
+      });
+      const data = await readJson(response);
+      if (!response.ok) {
+        throw new Error(data.message || 'No se pudo subir la imagen.');
+      }
+      imageUrlInput.value = data.imageUrl;
+      selectedImageFile = null;
+      imageFileInput.value = '';
+      renderImagePreview(data.imageUrl);
+      return data.imageUrl;
     }
 
     function hasOrganizerAccess() {
@@ -154,6 +205,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       document.querySelector('#ticketType').value = 'General';
       document.querySelector('#startAt').value = tomorrow.toISOString().slice(0, 16);
       document.querySelector('#status').value = 'DRAFT';
+      selectedImageFile = null;
+      imageFileInput.value = '';
+      renderImagePreview('');
       saveResult.innerHTML = '';
     }
 
@@ -167,6 +221,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       document.querySelector('#priceCents').value = event.priceCents;
       document.querySelector('#capacity').value = event.capacity;
       document.querySelector('#startAt').value = new Date(event.startAt).toISOString().slice(0, 16);
+      selectedImageFile = null;
+      imageFileInput.value = '';
+      renderImagePreview(event.imageUrl || '');
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
@@ -183,8 +240,10 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       }
 
       saveButton.disabled = true;
-      showSaveMessage('', editingEventId ? 'Guardando cambios...' : 'Creando evento...');
+      showSaveMessage('', selectedImageFile ? 'Subiendo imagen...' : (editingEventId ? 'Guardando cambios...' : 'Creando evento...'));
       try {
+        payload.imageUrl = await uploadSelectedImageIfNeeded();
+        showSaveMessage('', editingEventId ? 'Guardando cambios...' : 'Creando evento...');
         const response = await fetch(`${apiUrl}/organizer/events${editingEventId ? `/${editingEventId}` : ''}`, {
           method: editingEventId ? 'PUT' : 'POST',
           headers: authHeaders(),
@@ -197,8 +256,8 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         }
         showSaveMessage('success', editingEventId ? 'Evento actualizado correctamente.' : 'Evento creado correctamente.');
         await loadEvents();
-      } catch {
-        showSaveMessage('error', 'No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:8080.');
+      } catch (error) {
+        showSaveMessage('error', error.message || 'No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:8080.');
       } finally {
         saveButton.disabled = false;
       }
@@ -267,6 +326,25 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     document.querySelector('#resetFormButton').addEventListener('click', resetForm);
     document.querySelector('#loadEventsButton').addEventListener('click', loadEvents);
     document.querySelector('#loadReportsButton').addEventListener('click', loadReports);
+    imageFileInput.addEventListener('change', () => {
+      const file = imageFileInput.files?.[0];
+      selectedImageFile = file || null;
+      if (!file) {
+        renderImagePreview(imageUrlInput.value.trim());
+        return;
+      }
+      if (!file.type.startsWith('image/')) {
+        showSaveMessage('error', 'El archivo seleccionado debe ser una imagen.');
+        selectedImageFile = null;
+        imageFileInput.value = '';
+        return;
+      }
+      renderImagePreview(URL.createObjectURL(file));
+      showSaveMessage('', 'Imagen seleccionada. Se subirá al guardar el evento.');
+    });
+    imageUrlInput.addEventListener('input', () => {
+      if (!selectedImageFile) renderImagePreview(imageUrlInput.value.trim());
+    });
     loadEvents();
   </script>
 </BaseLayout>

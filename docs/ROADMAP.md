@@ -46,7 +46,7 @@ Priority values:
 - [x] DONE - Internal documentation files created.
 - [x] DONE - Docker Compose config validated with `docker compose config`.
 - [x] DONE - Frontend build validated after error-handling improvements.
-- [x] DONE - npm audit currently reports 0 vulnerabilities.
+- [ ] TODO - Review npm dependency vulnerabilities: latest `npm install` reported 1 moderate and 3 high vulnerabilities, but `npm audit --json` could not fetch details in this environment.
 - [x] DONE - Verify full startup with `docker compose up --build` while Docker Desktop is running.
 - [x] DONE - Verify full end-to-end user flow: login -> event detail -> purchase -> my tickets -> validation -> double validation blocked.
 - [x] DONE - Verify role permissions for USER, ORGANIZER, VALIDATOR, and ADMIN in the demo flow.
@@ -73,6 +73,14 @@ Priority values:
 - [x] DONE - Improve frontend form validation before sending API requests.
 - [x] DONE - Add clearer handling for expired sessions in the frontend.
 - [x] DONE - Reorganize backend folders into config, database, models, handlers, middleware, routes, services and utils without changing endpoints.
+- [x] DONE - Footer corregido para quedar al fondo de pantallas con poco contenido y más completo para la demo.
+- [x] DONE - Validaciones de checkout simulado para titular, tarjeta, vencimiento, CVV, DNI y email sin guardar datos sensibles.
+- [x] DONE - Corrección visual del checkout para evitar desbordes dentro de la card sticky.
+- [x] DONE - Cards de eventos con imágenes consistentes mediante aspect-ratio y object-fit.
+- [x] DONE - Filtros por departamento, categoría, venue, dirección y nombre mejorados también en frontend con normalización sin tildes.
+- [x] DONE - Upload de imagen desde archivo para organizador con preview, validación y endpoint multipart.
+- [x] DONE - Fuente personalizada local Playfair Display aplicada globalmente.
+- [x] DONE - Ajustes visuales menores para demo académica en footer, cards, checkout e inputs.
 - [ ] TODO - Add a clear screen for approving or rejecting organizers.
 - [ ] TODO - Document admin and organizer workflows with short examples.
 - [ ] TODO - Review CORS configuration before any non-local deployment.
@@ -82,6 +90,7 @@ Priority values:
 - [x] DONE - Improve responsive UI details on small screens.
 - [ ] TODO - Add pagination to admin lists, audit logs, and public event catalog.
 - [ ] TODO - Add endpoint documentation with request/response examples.
+- [ ] TODO - Run `npm audit` with registry/cache access and decide whether a safe non-breaking dependency update is possible.
 - [ ] TODO - Add backend unit tests for security helpers and ticket validation rules.
 - [ ] TODO - Add backend handler/service tests for critical flows.
 - [ ] TODO - Add a simple frontend smoke test or documented manual QA checklist.

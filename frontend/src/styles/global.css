@@ -19,9 +19,25 @@
   --border: #ead7c4;
   --shadow: 0 22px 70px rgba(91, 29, 21, 0.13);
   --radius: 24px;
+  --font-main: "Playfair Display", Georgia, "Times New Roman", system-ui, serif;
   font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-    sans-serif;
+    var(--font-main);
+}
+
+@font-face {
+  font-family: "Playfair Display";
+  src: url("../assets/fonts/PlayfairDisplay-VariableFont_wght.ttf") format("truetype");
+  font-weight: 400 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Playfair Display";
+  src: url("../assets/fonts/PlayfairDisplay-Italic-VariableFont_wght.ttf") format("truetype");
+  font-weight: 400 900;
+  font-style: italic;
+  font-display: swap;
 }
 
 * {
@@ -29,15 +45,28 @@
 }
 
 html {
+  min-height: 100%;
   scroll-behavior: smooth;
 }
 
 body {
+  min-height: 100vh;
   margin: 0;
   background:
     radial-gradient(circle at top left, rgba(214, 138, 45, 0.22), transparent 32rem),
     linear-gradient(180deg, var(--bg), #ffffff 62%);
   color: var(--text);
+  font-family: var(--font-main);
+}
+
+body,
+.page-shell {
+  display: flex;
+  flex-direction: column;
+}
+
+.page-shell {
+  min-height: 100vh;
 }
 
 a {
@@ -50,6 +79,7 @@ img {
 }
 
 main {
+  flex: 1;
   width: min(1180px, calc(100% - 32px));
   margin: 0 auto;
   padding: 34px 0 70px;
@@ -125,10 +155,12 @@ main {
 }
 
 .site-footer {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 0.8fr) minmax(190px, 0.6fr);
+  align-items: start;
   gap: 28px;
-  padding: 34px max(16px, calc((100vw - 1180px) / 2));
+  margin-top: auto;
+  padding: 38px max(16px, calc((100vw - 1180px) / 2));
   background: #241a14;
   color: #fff8ef;
 }
@@ -147,9 +179,18 @@ main {
 }
 
 .footer-links a {
+  display: inline-flex;
+  border: 1px solid rgba(255, 248, 239, 0.22);
+  border-radius: 999px;
+  padding: 8px 11px;
   color: #fff8ef;
   font-weight: 800;
   text-decoration: none;
+}
+
+.footer-meta {
+  color: #ead7c4;
+  line-height: 1.7;
 }
 
 .hero {
@@ -328,6 +369,7 @@ button.ghost {
 
 .event-image {
   position: relative;
+  height: clamp(190px, 22vw, 240px);
   min-height: 190px;
   background: linear-gradient(135deg, #9b2f1f, #d68a2d);
   overflow: hidden;
@@ -336,8 +378,8 @@ button.ghost {
 .event-image img {
   width: 100%;
   height: 100%;
-  min-height: 190px;
   object-fit: cover;
+  object-position: center;
   transition: transform 0.35s ease;
 }
 
@@ -412,6 +454,49 @@ button.ghost {
 .sticky {
   position: sticky;
   top: 94px;
+}
+
+#checkoutSlot {
+  min-width: 0;
+}
+
+.checkout-card {
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+}
+
+.checkout-card h2 {
+  font-size: clamp(1.35rem, 2vw, 1.75rem);
+}
+
+.checkout-card .actions {
+  align-items: stretch;
+}
+
+.checkout-card .actions .button,
+.checkout-card .actions button {
+  flex: 1 1 150px;
+}
+
+.checkout-summary {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface-warm);
+}
+
+.checkout-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .detail-hero {
@@ -529,6 +614,56 @@ textarea {
   color: var(--red);
 }
 
+.field-error {
+  display: block;
+  min-height: 1.05rem;
+  color: var(--red);
+  font-size: 0.83rem;
+  font-weight: 850;
+}
+
+.input-error {
+  border-color: var(--red);
+  box-shadow: 0 0 0 3px rgba(180, 35, 24, 0.11);
+}
+
+.success-panel {
+  display: grid;
+  gap: 12px;
+  border: 1px solid rgba(25, 124, 86, 0.2);
+  border-radius: 20px;
+  padding: 16px;
+  background: var(--green-soft);
+}
+
+.image-upload-box {
+  display: grid;
+  gap: 12px;
+  border: 1px dashed var(--border);
+  border-radius: 20px;
+  padding: 14px;
+  background: var(--surface-warm);
+}
+
+.image-preview {
+  display: none;
+  overflow: hidden;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  background: white;
+}
+
+.image-preview.is-visible {
+  display: block;
+}
+
+.image-preview img {
+  width: 100%;
+  max-height: 260px;
+  object-fit: cover;
+  object-position: center;
+}
+
 .code-box {
   overflow-wrap: anywhere;
   border: 2px dashed var(--primary);
@@ -643,7 +778,7 @@ th {
   }
 
   .site-footer {
-    display: grid;
+    grid-template-columns: 1fr;
   }
 }
 

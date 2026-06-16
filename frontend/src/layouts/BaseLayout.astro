@@ -10,6 +10,10 @@ const { title = 'MendoCultura' } = Astro.props;
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Ticketera mendocina para descubrir eventos culturales, turísticos y gastronómicos." />
+    <link rel="icon" type="image/png" href="/assets/img/favicon.png" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/assets/img/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/assets/img/favicon-16x16.png" />
+    <link rel="apple-touch-icon" href="/assets/img/apple-touch-icon.png" />
     <title>{title}</title>
   </head>
   <body>
@@ -38,11 +42,16 @@ const { title = 'MendoCultura' } = Astro.props;
       <div>
         <strong>MendoCultura</strong>
         <p>Entradas digitales para vendimias, bodegas, recitales, ferias y experiencias de Mendoza.</p>
+        <p>Demo académica de gestión, compra simulada y validación de entradas digitales.</p>
       </div>
       <div class="footer-links">
-        <a href="/events">Explorar eventos</a>
-        <a href="/validate">Validación</a>
-        <a href="/login">Acceso</a>
+        <a href="/events">Eventos</a>
+        <a href="/tickets">Mis entradas</a>
+        <a href="/validate">Validar entrada</a>
+      </div>
+      <div class="footer-meta">
+        <strong>Mendoza, Argentina</strong><br />
+        <span>Proyecto universitario · {new Date().getFullYear()}</span>
       </div>
     </footer>
     <script>

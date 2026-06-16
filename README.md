@@ -173,6 +173,7 @@ Organizador:
 - `GET /api/v1/organizer/events`
 - `POST /api/v1/organizer/events`
 - `PUT /api/v1/organizer/events/:id`
+- `POST /api/v1/organizer/events/upload-image`
 - `GET /api/v1/organizer/reports`
 
 Admin:
@@ -226,6 +227,6 @@ docker compose config
 
 ## Alcance actual
 
-La versión actual es una demo funcional con compra simulada mejorada. Incluye catálogo visual, navegación por rol, detalle enriquecido de evento, campos ampliados para organizadores, filtros case-insensitive/accent-insensitive y QR visual generado desde el código firmado del ticket.
+La versión actual es una demo funcional con compra simulada mejorada. Incluye catálogo visual, navegación por rol, detalle enriquecido de evento, campos ampliados para organizadores, filtros case-insensitive/accent-insensitive, carga de imagen principal desde archivo para eventos y QR visual generado desde el código firmado del ticket.
 
 No incluye todavía Mercado Pago real, webhooks, PDF, email, cámara QR ni modo offline. Esas mejoras siguen documentadas como futuras en `docs/ROADMAP.md`.

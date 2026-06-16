@@ -166,6 +166,7 @@ Routes:
 - `GET /api/v1/organizer/events`
 - `POST /api/v1/organizer/events`
 - `PUT /api/v1/organizer/events/:id`
+- `POST /api/v1/organizer/events/upload-image`
 - `GET /api/v1/organizer/reports`
 - `GET /api/v1/admin/users`
 - `GET /api/v1/admin/organizers`
@@ -456,3 +457,4 @@ The current design leaves room for:
 - Checkout remains simulated: the frontend shows fake payment fields but sends only `eventId` and `quantity` to the backend. Card number and CVV are never stored or sent.
 - `tickets.astro` and `ticket-detail.astro` render a QR from `ticket.code`. Validation continues to use the signed code and marks tickets as `USED` exactly once.
 - Organizer event forms expose the enriched `Event` fields while preserving GORM AutoMigrate compatibility.
+- Organizer event forms keep URL-based images and also support one main image upload through multipart/form-data. Uploaded demo files are saved under `backend/uploads/events`, served publicly from `/uploads/events/...`, ignored by Git, and persisted in Docker with the `backend_uploads` volume.

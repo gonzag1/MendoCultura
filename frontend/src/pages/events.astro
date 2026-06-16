@@ -60,6 +60,30 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       return String(value).replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[char]);
     }
 
+    function normalizeText(value = '') {
+      return String(value)
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+    }
+
+    function eventMatchesFilters(event, filters) {
+      const haystack = normalizeText([
+        event.title,
+        event.description,
+        event.category,
+        event.department,
+        event.venue,
+        event.address
+      ].filter(Boolean).join(' '));
+      if (filters.search && !haystack.includes(filters.search)) return false;
+      if (filters.category && normalizeText(event.category) !== filters.category) return false;
+      if (filters.department && normalizeText(event.department) !== filters.department) return false;
+      return true;
+    }
+
     async function readJson(response) {
       try {
         return await response.json();
@@ -93,24 +117,23 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     }
 
     async function loadEvents() {
-      const params = new URLSearchParams();
-      const search = document.querySelector('#search').value.trim();
-      const category = categorySelect.value;
-      const department = departmentSelect.value;
-      if (search) params.set('q', search);
-      if (category) params.set('category', category);
-      if (department) params.set('department', department);
+      const filters = {
+        search: normalizeText(document.querySelector('#search').value),
+        category: normalizeText(categorySelect.value),
+        department: normalizeText(departmentSelect.value)
+      };
 
       searchButton.disabled = true;
       eventsContainer.innerHTML = '<p class="notice">Cargando eventos...</p>';
       try {
-        const response = await fetch(`${apiUrl}/events?${params.toString()}`);
+        const response = await fetch(`${apiUrl}/events`);
         const data = await readJson(response);
         if (!response.ok) {
           eventsContainer.innerHTML = `<p class="notice error">${escapeHtml(data.message || 'No se pudieron cargar los eventos.')}</p>`;
           return;
         }
-        if (!data.events?.length) {
+        const filteredEvents = (data.events || []).filter((event) => eventMatchesFilters(event, filters));
+        if (!filteredEvents.length) {
           eventsContainer.innerHTML = `
             <div class="empty-state">
               <h2>No encontramos eventos para ese filtro</h2>
@@ -122,7 +145,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           return;
         }
 
-        eventsContainer.innerHTML = data.events.map(eventCard).join('');
+        eventsContainer.innerHTML = filteredEvents.map(eventCard).join('');
       } catch {
         eventsContainer.innerHTML = '<p class="notice error">No se pudo conectar con el backend. Verificá que esté corriendo en http://localhost:8080.</p>';
       } finally {

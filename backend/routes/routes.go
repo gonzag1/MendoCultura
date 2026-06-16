@@ -24,6 +24,7 @@ func NewRouter(db *gorm.DB, cfg config.Config) *gin.Engine {
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok"})
 	})
+	router.Static("/uploads", "./uploads")
 
 	api := router.Group("/api/v1")
 	api.POST("/auth/register", server.RegisterUser)
@@ -46,6 +47,7 @@ func NewRouter(db *gorm.DB, cfg config.Config) *gin.Engine {
 	organizer.GET("/events", server.ListOrganizerEvents)
 	organizer.POST("/events", server.CreateOrganizerEvent)
 	organizer.PUT("/events/:id", server.UpdateOrganizerEvent)
+	organizer.POST("/events/upload-image", server.UploadOrganizerEventImage)
 	organizer.GET("/reports", server.GetOrganizerReports)
 
 	admin := protected.Group("/admin")

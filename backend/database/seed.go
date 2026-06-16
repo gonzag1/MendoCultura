@@ -88,14 +88,6 @@ func ensureOrganizerProfile(tx *gorm.DB, organizerID uint) error {
 }
 
 func ensureEvents(tx *gorm.DB, organizerID uint) error {
-	var count int64
-	if err := tx.Model(&models.Event{}).Count(&count).Error; err != nil {
-		return err
-	}
-	if count > 0 {
-		return nil
-	}
-
 	events := []models.Event{
 		{
 			OrganizerID:         organizerID,
@@ -260,6 +252,12 @@ func ensureEvents(tx *gorm.DB, organizerID uint) error {
 	}
 
 	for _, event := range events {
+		var existing models.Event
+		if err := tx.Where("title = ?", event.Title).First(&existing).Error; err == nil {
+			continue
+		} else if err != gorm.ErrRecordNotFound {
+			return err
+		}
 		if err := tx.Create(&event).Error; err != nil {
 			return err
 		}
