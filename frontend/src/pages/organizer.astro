@@ -1,4 +1,4 @@
----
+﻿---
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
@@ -27,7 +27,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <label class="full">Descripción corta <textarea id="description"></textarea></label>
         <label class="full">Descripción completa <textarea id="extendedDescription"></textarea></label>
         <label>Departamento <select id="department"></select></label>
-        <label>Venue <input id="venue" /></label>
+        <label>Lugar del evento <input id="venue" /></label>
         <label class="full">Dirección <input id="address" /></label>
         <label class="full">Pegar URL de imagen <input id="imageUrl" placeholder="https://..." /></label>
         <div class="full image-upload-box">
@@ -40,7 +40,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         <label class="full">Mapa iframe o URL opcional <input id="mapUrl" placeholder="Opcional: se genera con dirección si queda vacío" /></label>
         <label>Fecha <input id="startAt" type="datetime-local" /></label>
         <label>Tipo de entrada <input id="ticketType" value="General" /></label>
-        <label>Precio en centavos <input id="priceCents" type="number" value="100000" min="0" /></label>
+        <label>Precio en pesos <input id="pricePesos" type="number" value="1000" min="0" step="1" /></label>
         <label>Cupo <input id="capacity" type="number" value="50" min="1" /></label>
         <label class="full">Información importante <textarea id="importantInfo"></textarea></label>
         <label class="full">Recomendaciones <textarea id="recommendations"></textarea></label>
@@ -187,7 +187,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         importantInfo: document.querySelector('#importantInfo').value.trim(),
         recommendations: document.querySelector('#recommendations').value.trim(),
         startAt: startDate.toISOString(),
-        priceCents: Number(document.querySelector('#priceCents').value),
+        priceCents: Math.round(Number(document.querySelector('#pricePesos').value) * 100),
         capacity: Number(document.querySelector('#capacity').value),
         status: document.querySelector('#status').value
       };
@@ -198,9 +198,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       formTitle.textContent = 'Crear evento';
       saveButton.textContent = 'Crear evento';
       document.querySelectorAll('#eventForm input, #eventForm textarea').forEach((input) => {
-        if (input.id !== 'priceCents' && input.id !== 'capacity' && input.id !== 'ticketType' && input.id !== 'startAt') input.value = '';
+        if (input.id !== 'pricePesos' && input.id !== 'capacity' && input.id !== 'ticketType' && input.id !== 'startAt') input.value = '';
       });
-      document.querySelector('#priceCents').value = '100000';
+      document.querySelector('#pricePesos').value = '1000';
       document.querySelector('#capacity').value = '50';
       document.querySelector('#ticketType').value = 'General';
       document.querySelector('#startAt').value = tomorrow.toISOString().slice(0, 16);
@@ -218,7 +218,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       ['title', 'description', 'extendedDescription', 'category', 'department', 'venue', 'address', 'imageUrl', 'galleryImages', 'mapUrl', 'ticketType', 'importantInfo', 'recommendations', 'status'].forEach((id) => {
         document.querySelector(`#${id}`).value = event[id] || (id === 'ticketType' ? 'General' : '');
       });
-      document.querySelector('#priceCents').value = event.priceCents;
+      document.querySelector('#pricePesos').value = Math.round((event.priceCents || 0) / 100);
       document.querySelector('#capacity').value = event.capacity;
       document.querySelector('#startAt').value = new Date(event.startAt).toISOString().slice(0, 16);
       selectedImageFile = null;
@@ -235,7 +235,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         return;
       }
       if (!payload.title || !payload.category || !payload.department || !payload.venue || payload.capacity < 1 || payload.priceCents < 0) {
-        showSaveMessage('error', 'Completá título, categoría, departamento, venue, precio y cupo válido.');
+        showSaveMessage('error', 'Completá título, categoría, departamento, lugar, precio y cupo válido.');
         return;
       }
 
@@ -280,7 +280,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
             <article class="card">
               <span class="badge ${event.status === 'PUBLISHED' ? 'success' : 'warning'}">${event.status}</span>
               <h3>${escapeHtml(event.title)}</h3>
-              <p>${escapeHtml(event.department)} · ${escapeHtml(event.venue)}</p>
+              <p>${escapeHtml(event.department)} - ${escapeHtml(event.venue)}</p>
               <p>${event.availableTickets} cupos disponibles de ${event.capacity}</p>
               <div class="progress"><span style="width:${percent}%"></span></div>
               <div class="actions"><button class="secondary" data-edit-event="${event.id}">Editar</button></div>
@@ -348,3 +348,4 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     loadEvents();
   </script>
 </BaseLayout>
+

@@ -1,4 +1,4 @@
----
+﻿---
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
@@ -53,22 +53,6 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       return String(value).replace(/\D/g, '');
     }
 
-    function passesLuhn(value) {
-      const digits = onlyDigits(value);
-      let sum = 0;
-      let shouldDouble = false;
-      for (let index = digits.length - 1; index >= 0; index -= 1) {
-        let digit = Number(digits[index]);
-        if (shouldDouble) {
-          digit *= 2;
-          if (digit > 9) digit -= 9;
-        }
-        sum += digit;
-        shouldDouble = !shouldDouble;
-      }
-      return digits.length > 0 && sum % 10 === 0;
-    }
-
     function expirationIsValid(value) {
       const match = String(value).trim().match(/^(\d{1,2})\s*\/\s*(\d{2}|\d{4})$/);
       if (!match) return false;
@@ -98,16 +82,11 @@ import BaseLayout from '../layouts/BaseLayout.astro';
         email: document.querySelector('#email')?.value.trim() || ''
       };
       const errors = {};
-      const cardDigits = onlyDigits(values.fakeCard);
-      const cardWithoutSpaces = values.fakeCard.replace(/\s/g, '');
       const cvvDigits = onlyDigits(values.cvv);
       const dniDigits = onlyDigits(values.dni);
 
       if (!values.cardHolder) errors.cardHolder = 'Ingresá el nombre del titular.';
       if (!values.fakeCard) errors.fakeCard = 'Ingresá el número de tarjeta.';
-      else if (cardDigits !== cardWithoutSpaces) errors.fakeCard = 'El número de tarjeta debe contener solo números.';
-      else if (cardDigits.length !== 16) errors.fakeCard = 'El número de tarjeta debe tener 16 dígitos.';
-      else if (!passesLuhn(cardDigits)) errors.fakeCard = 'Revisá el número de tarjeta ficticio.';
 
       if (!values.expiration) errors.expiration = 'Ingresá la fecha de vencimiento.';
       else if (!expirationIsValid(values.expiration)) errors.expiration = 'La fecha de vencimiento no es válida.';
@@ -195,9 +174,9 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           <aside class="checkout-card sticky">
             <h2>Pago simulado</h2>
             ${stepHeader}
-            <p class="notice">No ingreses datos reales. Esta pantalla no guarda número de tarjeta ni CVV.</p>
+            <p class="notice">No ingreses datos reales. Esta demo no valida ni guarda número de tarjeta o CVV.</p>
             <label>Nombre del titular <input id="cardHolder" autocomplete="off" /><span id="cardHolderError" class="field-error"></span></label>
-            <label>Número de tarjeta ficticio <input id="fakeCard" inputmode="numeric" maxlength="19" placeholder="4242 4242 4242 4242" autocomplete="off" /><span id="fakeCardError" class="field-error"></span></label>
+            <label>Número de tarjeta demo <input id="fakeCard" inputmode="numeric" placeholder="4242 4242 4242 4242" autocomplete="off" /><span id="fakeCardError" class="field-error"></span></label>
             <div class="form-grid">
               <label>Vencimiento <input id="expiration" placeholder="12/30" autocomplete="off" /><span id="expirationError" class="field-error"></span></label>
               <label>CVV <input id="cvv" inputmode="numeric" maxlength="4" autocomplete="off" /><span id="cvvError" class="field-error"></span></label>
