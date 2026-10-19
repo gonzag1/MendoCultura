@@ -114,3 +114,17 @@ Priority values:
 - [ ] DEFERRED - PostgreSQL backup, WAL archiving, or replication plan.
 - [ ] DEFERRED - Advanced technical metrics: P95 latency, goroutines, DB connections, error rate.
 - [ ] DEFERRED - Rate limiting and additional OWASP hardening.
+
+## Mercado Pago integration (single seller)
+
+- [x] DONE - Checkout Pro backend, stock holds, owner purchase endpoint and frontend redirect/return page.
+- [x] DONE - Signed payment webhooks with account/mode/currency/amount validation and transactional ticket issuance.
+- [x] DONE - Disable simulated payment endpoint; exclude pending stock from sales reports.
+- [x] DONE - Environment examples, Docker configuration and setup documentation.
+- [ ] TODO - Complete a sandbox payment with MendoCultura seller credentials and public HTTPS URLs; test approval, rejection, expiry and refund notifications.
+- [ ] DEFERRED - Automatic refund processing, missed-webhook reconciliation and operator resolution UI. PAYMENT_REVIEW and duplicate-payment audit alerts require manual handling in Mercado Pago.
+- [x] DONE - Verified go test ./... against isolated PostgreSQL (duplicates, concurrent late payments, expiry, refunds, resume and unsigned webhook); frontend build and Docker Compose config passed.
+
+- [x] DONE - Manual owner purchase reconciliation through Mercado Pago API; verified test sellers may return live_mode=true, authenticated /users/me must confirm the test_user tag and collector ID. Regression tests cover real-seller rejection, owner access, reference and amount validation.
+- [x] DONE - Recovered the existing approved sandbox purchase through the owner reconciliation endpoint; verified PAID status and exactly one VALID ticket. Backend tests against isolated PostgreSQL schemas and frontend build passed.
+- [ ] TODO - Verify automatic signed webhook delivery after correcting its secret; API reconciliation confirms the existing purchase but does not prove the earlier 401 is resolved.

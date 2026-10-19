@@ -1,3 +1,5 @@
+> Updated payment scope: see the Mercado Pago section in ARCHITECTURE.md. Earlier references to the simulated checkout describe the original demo.
+
 # Project Context - MendoCultura
 
 ## Project name
@@ -86,8 +88,8 @@ Implemented in the current codebase:
 
 Planned or deferred features from the technical report:
 
-- Real Mercado Pago sandbox integration.
-- Payment webhooks.
+- End-to-end Mercado Pago sandbox verification with seller credentials.
+- Missed-webhook reconciliation and automatic refunds.
 - Confirmation emails.
 - PDF ticket generation.
 - Camera-based QR scanning.
@@ -108,14 +110,14 @@ Current scope is a functional demo base:
 
 - Events can be listed and viewed.
 - Users can register/login.
-- A logged-in user can buy tickets through a simulated paid purchase.
+- A logged-in user can initiate Mercado Pago Checkout Pro; approved webhooks issue tickets.
 - Ticket capacity is decremented safely at the database level.
 - Tickets have a unique signed code.
 - Users can see their own tickets.
 - Organizers/admins can validate tickets online.
 - A used ticket cannot be validated again.
 
-Payment is simulated by design. The architecture is prepared for future real payment integration, but the current version must not claim that Mercado Pago, PDF, email, camera scanning, or offline mode are complete.
+Payment uses Mercado Pago Checkout Pro with a single seller account, signed webhooks and pending stock holds. Sandbox end-to-end verification requires configured credentials and public HTTPS URLs. PDF, email, camera scanning and offline mode remain deferred.
 
 ## Important project rules
 
@@ -176,8 +178,8 @@ Avoid mixing ticket/entry/pass/reservation for the same concept unless a future 
 - Use JWT HS256 implemented locally instead of adding a JWT dependency.
 - Use bcrypt for password hashing.
 - Use `VALID` as the operative confirmed ticket state instead of duplicating semantics with `CONFIRMED`.
-- Implement purchase as simulated `PAID` purchase for now.
-- Prepare the model for future payments but do not pretend Mercado Pago is complete.
+- Create PENDING purchases and issue tickets only after verified Mercado Pago approval.
+- Keep credentials backend-only and document the remaining sandbox verification.
 - Generate a signed ticket code with prefix `MC-` and render it as a visual QR in the frontend. PDF remains deferred.
 - Use a basic audit log for important actions.
 - Keep frontend static Astro pages that call the API from browser-side scripts, with reusable styling and page-local scripts.

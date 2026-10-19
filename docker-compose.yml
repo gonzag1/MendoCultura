@@ -28,6 +28,12 @@ services:
       DATABASE_URL: postgres://mendocultura:mendocultura@postgres:5432/mendocultura?sslmode=disable
       JWT_SECRET: local-development-secret
       SEED_DATA: "true"
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      MP_WEBHOOK_SECRET: ${MP_WEBHOOK_SECRET:-}
+      MP_COLLECTOR_ID: ${MP_COLLECTOR_ID:-}
+      MP_TEST_MODE: ${MP_TEST_MODE:-true}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4321}
+      BACKEND_URL: ${BACKEND_URL:-}
     ports:
       - "8080:8080"
     volumes:
@@ -37,7 +43,7 @@ services:
     build:
       context: ./frontend
       args:
-        PUBLIC_API_URL: http://localhost:8080/api/v1
+        PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8080/api/v1}
     container_name: mendocultura-frontend
     depends_on:
       - backend

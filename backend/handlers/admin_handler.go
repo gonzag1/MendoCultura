@@ -119,7 +119,17 @@ func (s *Server) GetOrganizerReports(c *gin.Context) {
 
 	reports := []report{}
 	for _, event := range events {
-		sold := event.Capacity - event.AvailableTickets
+		var soldCount int64
+		if err := s.db.Model(&models.Ticket{}).Where("event_id = ? AND status IN ?", event.ID, []string{models.TicketValid, models.TicketUsed}).Count(&soldCount).Error; err != nil {
+			utils.ServerError(c, "No se pudieron calcular las estadísticas.")
+			return
+		}
+		sold := int(soldCount)
+		var income int64
+		if err := s.db.Model(&models.Purchase{}).Where("event_id = ? AND status = ?", event.ID, models.PurchasePaid).Select("COALESCE(SUM(total_cents), 0)").Scan(&income).Error; err != nil {
+			utils.ServerError(c, "No se pudieron calcular las estadísticas.")
+			return
+		}
 		var used int64
 		s.db.Model(&models.Ticket{}).Where("event_id = ? AND status = ?", event.ID, models.TicketUsed).Count(&used)
 		occupancy := 0
@@ -131,7 +141,7 @@ func (s *Server) GetOrganizerReports(c *gin.Context) {
 			Title:            event.Title,
 			SoldTickets:      sold,
 			AvailableTickets: event.AvailableTickets,
-			EstimatedIncome:  int64(sold) * event.PriceCents,
+			EstimatedIncome:  income,
 			UsedTickets:      used,
 			OccupancyPercent: occupancy,
 		})

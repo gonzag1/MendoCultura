@@ -112,7 +112,7 @@ Con `SEED_DATA=true`, el backend crea datos iniciales si la base está vacía.
 3. Probar filtros por nombre, categoría o departamento, incluso sin tildes.
 4. Entrar al detalle de un evento.
 5. Iniciar sesión como usuario demo.
-6. Completar la compra simulada con selector, resumen y formulario de pago ficticio.
+6. Completar el checkout en Mercado Pago con las credenciales de prueba configuradas (ver abajo).
 7. Ir a **Mis entradas**.
 8. Ver el QR visual o abrir el detalle de la entrada.
 9. Iniciar sesión como organizador, validador o admin para validar.
@@ -227,6 +227,58 @@ docker compose config
 
 ## Alcance actual
 
-La versión actual es una demo funcional con compra simulada mejorada. Incluye catálogo visual, navegación por rol, detalle enriquecido de evento, campos ampliados para organizadores, filtros case-insensitive/accent-insensitive, carga de imagen principal desde archivo para eventos y QR visual generado desde el código firmado del ticket.
+La versión actual incluye el flujo de Checkout Pro de Mercado Pago para una cuenta de MendoCultura; requiere configuración y una prueba sandbox real antes de usar cobros en producción. Incluye catálogo visual, navegación por rol, detalle enriquecido de evento, campos ampliados para organizadores, filtros case-insensitive/accent-insensitive, carga de imagen principal desde archivo para eventos y QR visual generado desde el código firmado del ticket.
 
-No incluye todavía Mercado Pago real, webhooks, PDF, email, cámara QR ni modo offline. Esas mejoras siguen documentadas como futuras en `docs/ROADMAP.md`.
+No incluye todavía PDF, email, cámara QR ni modo offline. La conciliación de webhooks perdidos y las devoluciones automáticas quedan pendientes. Esas mejoras siguen documentadas como futuras en `docs/ROADMAP.md`.
+
+## Configurar Mercado Pago
+
+1. Creá una aplicación de Checkout Pro para la cuenta de MendoCultura en Mercado Pago Developers. Para comenzar, usá un vendedor y comprador de prueba diferentes.
+2. Configurá estas variables **solo en el backend**:
+
+| Variable | Valor |
+|---|---|
+| MP_ACCESS_TOKEN | Access Token del vendedor de prueba |
+| MP_COLLECTOR_ID | ID numérico de ese vendedor |
+| MP_WEBHOOK_SECRET | Clave secreta de firma generada al configurar Webhooks |
+| MP_TEST_MODE | true para sandbox; false solo con credenciales de producción |
+| FRONTEND_URL | URL pública HTTPS del frontend, sin barra final |
+| BACKEND_URL | URL pública HTTPS del backend, sin /api/v1 |
+
+3. Configurá Webhooks para **Pagos** en el ambiente correspondiente, apuntando a
+   `https://TU-BACKEND/api/v1/payments/webhook`.
+4. Para pruebas locales exponé ambos servicios con URLs HTTPS de túneles. Configurá
+   `PUBLIC_API_URL=https://TU-BACKEND/api/v1` al construir el frontend, para que
+   pueda consultar la API desde la página HTTPS de retorno.
+5. Docker Compose toma estas variables del entorno o de un archivo `.env` en
+   la raíz. Podés copiar allí las variables de pago de `backend/.env.example`.
+   No publiques credenciales. En ejecución manual, Go no carga archivos .env:
+   exportá las variables con `$env:MP_ACCESS_TOKEN="..."` y las demás antes de
+   `go run ./cmd`. Reconstruí el frontend si cambió PUBLIC_API_URL.
+6. Abrí el frontend desde su URL pública HTTPS, iniciá sesión, elegí un evento con más de 30 minutos de anticipación y pagá
+   con el comprador de prueba. El retorno muestra “pendiente” hasta que el
+   webhook confirme el pago. Solo entonces aparecen las entradas y QR.
+
+La reserva dura 30 minutos; al reintentar se retoma la compra pendiente con su
+cantidad e importe originales. El backend calcula el precio y no agrega el
+antiguo cargo de servicio ficticio. Sin configuración completa devuelve 503,
+y el antiguo endpoint simulado tampoco emite entradas.
+
+Nuevos endpoints: `POST /api/v1/payments/checkout` y
+`GET /api/v1/purchases/:id` requieren JWT; `POST /api/v1/payments/webhook`
+requiere firma de Mercado Pago.
+
+Antes de producción verificá en sandbox aprobación, rechazo, duplicados,
+vencimiento y devolución. Si aparece PAYMENT_REVIEW o una alerta
+DUPLICATE_PAYMENT_REVIEW en auditoría, revisá y devolvé el pago desde Mercado
+Pago. Las devoluciones parciales también cancelan todas las entradas de la
+compra. La consulta de compra permite conciliación manual con la API de Mercado Pago. No hay devoluciones automáticas ni conciliación programada;
+monitoreá las notificaciones en el panel de Mercado Pago. El botón Actualizar estado verifica el pago directamente con la API si el webhook falló. Las reservas vencidas
+se liberan al consultar el catálogo o iniciar otro checkout. Un error incierto al
+crear la preferencia evita repetir la operación: esperá el vencimiento o
+revisá la compra con un operador.
+
+Pruebas de PostgreSQL (base aislada de prueba, nunca producción):
+`$env:TEST_DATABASE_URL="postgres://postgres:payment-tests@localhost:55439/postgres?sslmode=disable"`
+y luego `go test ./...` desde backend. Sin esa variable se omiten las pruebas
+que necesitan PostgreSQL.

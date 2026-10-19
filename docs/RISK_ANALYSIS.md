@@ -41,3 +41,7 @@
 - Do not mark a risk closed unless it has been verified.
 - Keep demo limitations explicit; do not present deferred features as complete.
 - Prefer small, verifiable changes over large rewrites.
+
+## Payment integration update
+
+Checkout Pro replaces the simulated checkout. Signed notifications, collector/mode/currency/amount checks, event/purchase locks and expiring stock holds protect issuance. Sandbox verification still needs credentials. Monitor webhook delivery and audit alerts: late payments without stock and additional approved attempts require manual refunds. Holds expire lazily on public catalog/detail reads and the next checkout; refunded issued tickets do not automatically replenish stock. No reconciliation worker or automatic refund flow is claimed.

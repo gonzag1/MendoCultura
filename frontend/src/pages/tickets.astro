@@ -12,6 +12,7 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       </div>
       <a class="button secondary" href="/events">Explorar eventos</a>
     </div>
+    <div id="pendingPurchases" aria-live="polite"></div>
     <div id="tickets" class="grid" aria-live="polite"></div>
   </section>
 
@@ -89,6 +90,11 @@ import BaseLayout from '../layouts/BaseLayout.astro';
           container.innerHTML = `<p class="notice error">${escapeHtml(data.message || 'No se pudieron cargar las entradas.')}</p>`;
           return;
         }
+        document.querySelector('#pendingPurchases').innerHTML = (data.purchases || []).map((purchase) => `
+          <article class="card"><h2>${escapeHtml(purchase.event?.title || 'Compra')}</h2>
+          <p>${purchase.quantity} entradas · ${escapeHtml(purchase.status === 'PAYMENT_REVIEW' ? 'Pago en revisión: contactá a MendoCultura' : 'Compra sin confirmar')}</p>
+          <a class="button secondary" href="/payment-result?purchaseId=${encodeURIComponent(purchase.id)}">Consultar compra</a></article>
+        `).join('');
         if (!data.tickets?.length) {
           container.innerHTML = '<div class="empty-state"><h2>Todavía no compraste entradas</h2><p>Explorá la agenda mendocina y elegí tu próximo evento.</p><a class="button" href="/events">Explorar eventos</a></div>';
           return;

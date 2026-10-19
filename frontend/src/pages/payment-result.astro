@@ -1,0 +1,55 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+<BaseLayout title="Estado del pago | MendoCultura">
+  <section class="checkout-card">
+    <h1>Estado de tu compra</h1>
+    <p id="paymentStatus" class="notice" aria-live="polite">Consultando la confirmación del pago...</p>
+    <button id="refreshPayment">Actualizar estado</button>
+    <a id="resumePayment" class="button" hidden>Continuar en Mercado Pago</a>
+    <div class="actions"><a class="button" href="/tickets">Mis entradas</a><a href="/events">Explorar eventos</a></div>
+  </section>
+  <script>
+    const apiUrl = import.meta.env.PUBLIC_API_URL || 'http://localhost:8080/api/v1';
+    const purchaseId = new URLSearchParams(location.search).get('purchaseId');
+    const status = document.querySelector('#paymentStatus');
+    const button = document.querySelector('#refreshPayment');
+    let attempts = 0;
+    let timer;
+    async function refresh(sync = false) {
+      clearTimeout(timer);
+      const token = localStorage.getItem('mendocultura_token');
+      if (!token) { status.textContent = 'Iniciá sesión para consultar tu compra.'; return; }
+      if (!purchaseId || !/^\d+$/.test(purchaseId)) { status.textContent = 'No se encontró la compra.'; return; }
+      button.disabled = true;
+      try {
+        const response = await fetch(`${apiUrl}/purchases/${purchaseId}${sync ? '/sync' : ''}`, { method: sync ? 'POST' : 'GET', headers: { Authorization: `Bearer ${token}` } });
+        if (!response.ok) { status.textContent = 'No se pudo consultar la compra. Revisá tu sesión y reintentá.'; return; }
+        const { purchase } = await response.json();
+        const expired = purchase.status === 'PENDING' && new Date(purchase.expiresAt) < new Date();
+        const resume = document.querySelector('#resumePayment');
+        resume.hidden = true;
+        if (purchase.status === 'PENDING' && !expired && purchase.checkoutUrl) {
+          const target = new URL(purchase.checkoutUrl);
+          if (target.protocol === 'https:' && ['www.mercadopago.com.ar', 'sandbox.mercadopago.com.ar'].includes(target.hostname)) {
+            resume.href = target.href;
+            resume.hidden = false;
+          }
+        }
+        const messages = {
+          PAID: 'Pago confirmado. Tus entradas y QR ya están disponibles en Mis entradas.',
+          PENDING: expired ? 'El plazo de reserva terminó. Si pagaste, estamos esperando la confirmación; no vuelvas a pagar.' : 'Todavía no recibimos la confirmación. Si pagaste, esperá antes de iniciar otra compra.',
+          EXPIRED: 'La reserva venció. Si pagaste, esperá la confirmación y no vuelvas a pagar.',
+          PAYMENT_REVIEW: 'Recibimos el pago, pero la compra necesita revisión. Contactá a MendoCultura para gestionar la devolución.',
+          REFUNDED: 'El pago fue devuelto o revertido. Las entradas de esta compra están canceladas.'
+        };
+        status.textContent = messages[purchase.status] || 'La compra no está confirmada.';
+        if ((purchase.status === 'PENDING' || purchase.status === 'EXPIRED') && ++attempts < 20) timer = setTimeout(() => refresh(), 3000);
+      } catch { status.textContent = 'No se pudo conectar. Podés actualizar el estado en unos segundos.'; }
+      finally { button.disabled = false; }
+    }
+    button.addEventListener('click', () => { attempts = 0; refresh(true); });
+    window.addEventListener('pagehide', () => clearTimeout(timer));
+    refresh();
+  </script>
+</BaseLayout>

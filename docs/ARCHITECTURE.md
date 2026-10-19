@@ -218,27 +218,42 @@ User submits email/password
 
 The auth middleware parses the token and loads the user from the database. This means a suspended or inactive user can be blocked on the next protected request instead of waiting for token expiry.
 
-## Purchase simulation flow
+## Mercado Pago Checkout Pro
 
-```text
-Authenticated user completes the frontend checkout simulation
-  -> selects ticket type and quantity
-  -> reviews summary
-  -> fills fake payment form without persisting card data
-  -> confirms
-  -> POST /api/v1/tickets/reserve
-  -> Backend starts SERIALIZABLE DB transaction
-  -> Backend locks event row with SELECT FOR UPDATE semantics
-  -> Backend checks event is PUBLISHED and in the future
-  -> Backend checks availableTickets >= quantity
-  -> Backend decrements availableTickets
-  -> Backend creates Purchase with status PAID
-  -> Backend creates Ticket rows with status VALID
-  -> Backend generates signed codes and saves them
-  -> Backend writes audit log
-```
+A single MendoCultura seller receives ARS payments. Authenticated clients call
+`POST /api/v1/payments/checkout` with eventId and quantity (1–4). The backend
+locks the event, reclaims expired holds, snapshots the server price, reserves
+stock for 30 minutes and creates a PENDING purchase. One pending purchase per
+user/event is reused with its original quantity and amount. The legacy
+`POST /tickets/reserve` now calls the same real checkout; it cannot approve a
+simulated purchase. Tickets are created only by verified payment processing.
 
-This is intentionally a simulated paid purchase. Mercado Pago and webhooks are not implemented yet.
+The provider preference includes a random external_reference, HTTPS return
+URLs, a notification URL, ARS prices and expiration. Cash/ATM methods are
+excluded. A persisted claim prevents repeated preference creation after an
+uncertain response. Such purchases require waiting for expiration or operator
+review, rather than risking a second charge. No service fee is charged.
+
+`POST /api/v1/payments/webhook` validates x-signature HMAC-SHA256 against the
+query data.id and x-request-id, then retrieves /v1/payments/{id} using the
+backend token. It checks collector, test/live mode, currency, exact amount and
+purchase reference. A transaction locks event then purchase; duplicate approved
+notifications cannot create extra tickets. Other payment attempts cannot
+replace the accepted payment. Additional approved attempts create audit alerts
+for manual refunds. Provider/DB failures return errors for webhook retries.
+
+Expired holds are reclaimed lazily on public catalog/detail reads and when another checkout starts for that event. Late approved payments reacquire stock if possible. An unavailable,
+cancelled or past event moves the purchase to PAYMENT_REVIEW, creates an audit
+alert and requires a manual refund in Mercado Pago. Refunds (including partial
+refunds) and chargebacks cancel the purchase's tickets; already issued stock is
+not resold automatically. Rejected attempts do not issue tickets and retain
+the hold until expiry, allowing retry inside the same preference.
+
+The return page polls `GET /api/v1/purchases/:id` (owner JWT required), showing
+only the backend status. Redirect parameters never authorize tickets. Webhook
+delivery must be enabled and monitored; scheduled reconciliation, automatic refunds and operator resolution UI remain deferred. Owner-authenticated POST /api/v1/purchases/:id/sync searches by the stored random reference, retrieves each payment, verifies seller/environment/currency/amount, and applies the same idempotent transaction. The return page calls this endpoint only when the user clicks Actualizar estado; automatic polling stays local. Local test suites
+cover provider parsing/signatures and isolated PostgreSQL payment processing;
+a real sandbox purchase still needs seller credentials and public HTTPS URLs.
 
 ## Ticket generation flow
 

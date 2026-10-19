@@ -44,6 +44,10 @@ type eventRequest struct {
 }
 
 func (s *Server) ListPublicEvents(c *gin.Context) {
+	if err := s.expirePaymentHolds(); err != nil {
+		utils.ServerError(c, "No se pudo actualizar la disponibilidad.")
+		return
+	}
 	var events []models.Event
 	if err := s.db.Where("status = ?", models.EventPublished).Order("start_at asc").Find(&events).Error; err != nil {
 		utils.ServerError(c, "No se pudieron consultar los eventos.")
@@ -75,6 +79,10 @@ func (s *Server) ListPublicEvents(c *gin.Context) {
 }
 
 func (s *Server) GetPublicEvent(c *gin.Context) {
+	if err := s.expirePaymentHolds(); err != nil {
+		utils.ServerError(c, "No se pudo actualizar la disponibilidad.")
+		return
+	}
 	id, ok := parseID(c, "id")
 	if !ok {
 		return

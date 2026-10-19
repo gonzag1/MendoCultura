@@ -3,9 +3,7 @@ package handlers
 import (
 	"MendoCultura/middleware"
 	"MendoCultura/utils"
-	"database/sql"
 	"errors"
-	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -28,88 +26,6 @@ type checkInRequest struct {
 	EventID uint   `json:"eventId"`
 }
 
-func (s *Server) ReserveTickets(c *gin.Context) {
-	user, _ := middleware.CurrentUser(c)
-	var req reserveTicketsRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		utils.BadRequest(c, "Los datos de compra no son válidos.")
-		return
-	}
-	if req.EventID == 0 || req.Quantity <= 0 || req.Quantity > 4 {
-		utils.BadRequest(c, "Podés comprar entre 1 y 4 entradas por evento.")
-		return
-	}
-
-	var purchase models.Purchase
-	var tickets []models.Ticket
-	err := s.db.Transaction(func(tx *gorm.DB) error {
-		var event models.Event
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).First(&event, req.EventID).Error; err != nil {
-			return err
-		}
-		if event.Status != models.EventPublished || !event.StartAt.After(time.Now()) {
-			return errors.New("event_not_available")
-		}
-		if event.AvailableTickets < req.Quantity {
-			return errors.New("not_enough_tickets")
-		}
-
-		event.AvailableTickets -= req.Quantity
-		if err := tx.Save(&event).Error; err != nil {
-			return err
-		}
-
-		purchase = models.Purchase{
-			UserID:     user.ID,
-			EventID:    event.ID,
-			Quantity:   req.Quantity,
-			TotalCents: event.PriceCents * int64(req.Quantity),
-			Status:     models.PurchasePaid,
-		}
-		if err := tx.Create(&purchase).Error; err != nil {
-			return err
-		}
-
-		for i := 0; i < req.Quantity; i++ {
-			ticket := models.Ticket{
-				UserID:     user.ID,
-				EventID:    event.ID,
-				PurchaseID: purchase.ID,
-				Status:     models.TicketValid,
-				Code:       "pending",
-			}
-			if err := tx.Create(&ticket).Error; err != nil {
-				return err
-			}
-			code, err := services.NewTicketCode(ticket.ID, s.config.JWTSecret)
-			if err != nil {
-				return err
-			}
-			ticket.Code = code
-			if err := tx.Save(&ticket).Error; err != nil {
-				return err
-			}
-			tickets = append(tickets, ticket)
-		}
-		return nil
-	}, &sql.TxOptions{Isolation: sql.LevelSerializable})
-
-	if err != nil {
-		switch err.Error() {
-		case "event_not_available":
-			utils.Conflict(c, "El evento no está disponible para comprar entradas.")
-		case "not_enough_tickets":
-			utils.Conflict(c, "No hay cupos disponibles suficientes.")
-		default:
-			utils.ServerError(c, "No se pudo completar la compra simulada.")
-		}
-		return
-	}
-
-	s.audit(&user.ID, "TICKETS_RESERVED", "purchases", purchase.ID, fmt.Sprintf("Compra simulada de %d entradas", req.Quantity))
-	c.JSON(http.StatusCreated, gin.H{"purchase": purchase, "tickets": tickets})
-}
-
 func (s *Server) ListMyTickets(c *gin.Context) {
 	user, _ := middleware.CurrentUser(c)
 	var tickets []models.Ticket
@@ -117,7 +33,12 @@ func (s *Server) ListMyTickets(c *gin.Context) {
 		utils.ServerError(c, "No se pudieron consultar tus entradas.")
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"tickets": tickets})
+	var purchases []models.Purchase
+	if err := s.db.Preload("Event").Where("user_id = ? AND status IN ?", user.ID, []string{models.PurchasePending, "PAYMENT_REVIEW", "EXPIRED"}).Order("created_at desc").Limit(20).Find(&purchases).Error; err != nil {
+		utils.ServerError(c, "No se pudieron consultar tus compras.")
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"tickets": tickets, "purchases": purchases})
 }
 
 func (s *Server) GetMyTicket(c *gin.Context) {
